@@ -93,7 +93,7 @@
 ## 🚀 快速上手
 
 ### 方式一：直接运行成品
-1. 将编译好的 `ScrcpyGUI.exe` 放入官方 scrcpy 运行目录（与 `scrcpy.exe`、`adb.exe` 同级）；
+1. 解压便携包，保持 `ScrcpyGUI.exe` 与 `core\` 目录同级（引擎已内置在 `core\`）；
 2. 手机开启 **开发者选项** 与 **USB 调试** 并连接电脑；
 3. 双击打开 `ScrcpyGUI.exe`，点击 **「🚀 启动超清投屏」** 即可。
 

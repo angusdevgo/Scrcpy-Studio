@@ -1197,6 +1197,8 @@ namespace ScrcpyStudio
 
             string[] candidates = new string[]
             {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "core", "scrcpy.exe"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\core\scrcpy.exe"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrcpy.exe"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\scrcpy.exe"),
                 @"D:\Data\Scrcpy\scrcpy.exe",
@@ -1680,19 +1682,10 @@ namespace ScrcpyStudio
             };
             btnQuickWake.Click += (s, e) => SendAdbKeyEvent(224);
 
-            StudioButton btnQuickTerm = new StudioButton
-            {
-                Text = "💻 打开 ADB 终端",
-                Location = new Point(410, 16),
-                Size = new Size(150, 36),
-                Style = StudioButton.ButtonStyle.Secondary
-            };
-            btnQuickTerm.Click += (s, e) => OpenAdbTerminal();
-
             StudioButton btnQuickRestartAdb = new StudioButton
             {
                 Text = "🔄 重启 ADB 服务",
-                Location = new Point(572, 16),
+                Location = new Point(410, 16),
                 Size = new Size(150, 36),
                 Style = StudioButton.ButtonStyle.Secondary
             };
@@ -1701,13 +1694,13 @@ namespace ScrcpyStudio
             btnNavBarToggle = new StudioButton
             {
                 Text = "🧭 悬浮导航栏",
-                Location = new Point(730, 16),
-                Size = new Size(134, 36),
+                Location = new Point(572, 16),
+                Size = new Size(150, 36),
                 Style = StudioButton.ButtonStyle.Secondary
             };
             btnNavBarToggle.Click += (s, e) => ToggleNavBar();
 
-            cardQuickTools.Controls.AddRange(new Control[] { lblToolHint, btnQuickCap, btnQuickWake, btnQuickTerm, btnQuickRestartAdb, btnNavBarToggle });
+            cardQuickTools.Controls.AddRange(new Control[] { lblToolHint, btnQuickCap, btnQuickWake, btnQuickRestartAdb, btnNavBarToggle });
             pnl.Controls.Add(cardQuickTools);
 
             return pnl;
@@ -1983,13 +1976,10 @@ namespace ScrcpyStudio
             };
             cardClip.Controls.Add(lblCmdTitle);
 
-            StudioButton btnTerm = new StudioButton { Text = "💻 打开独立 ADB 命令行", Location = new Point(22, 184), Size = new Size(200, 42), Style = StudioButton.ButtonStyle.Secondary };
-            btnTerm.Click += (s, e) => OpenAdbTerminal();
-
-            StudioButton btnOpenWorkDir = new StudioButton { Text = "📂 打开工作台目录", Location = new Point(234, 184), Size = new Size(180, 42), Style = StudioButton.ButtonStyle.Secondary };
+            StudioButton btnOpenWorkDir = new StudioButton { Text = "📂 打开工作台目录", Location = new Point(22, 184), Size = new Size(180, 42), Style = StudioButton.ButtonStyle.Secondary };
             btnOpenWorkDir.Click += (s, e) => Process.Start("explorer.exe", AppDomain.CurrentDomain.BaseDirectory);
 
-            StudioButton btnInstallApk = new StudioButton { Text = "📦 选择 APK 安装到设备", Location = new Point(426, 184), Size = new Size(200, 42), Style = StudioButton.ButtonStyle.Secondary };
+            StudioButton btnInstallApk = new StudioButton { Text = "📦 选择 APK 安装到设备", Location = new Point(214, 184), Size = new Size(200, 42), Style = StudioButton.ButtonStyle.Secondary };
             btnInstallApk.Click += (s, e) =>
             {
                 OpenFileDialog ofd = new OpenFileDialog { Filter = "Android 安装包 (*.apk)|*.apk" };
@@ -2004,7 +1994,7 @@ namespace ScrcpyStudio
                 }
             };
 
-            cardClip.Controls.AddRange(new Control[] { btnTerm, btnOpenWorkDir, btnInstallApk });
+            cardClip.Controls.AddRange(new Control[] { btnOpenWorkDir, btnInstallApk });
 
             pnl.Controls.Add(cardClip);
             return pnl;
@@ -2308,20 +2298,6 @@ namespace ScrcpyStudio
                 MessageBox.Show("截图失败: " + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 AppendLog("截图失败: " + ex.Message);
             }
-        }
-
-        private void OpenAdbTerminal()
-        {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe")
-                {
-                    WorkingDirectory = File.Exists(scrcpyExePath) ? Path.GetDirectoryName(scrcpyExePath) : AppDomain.CurrentDomain.BaseDirectory
-                };
-                Process.Start(psi);
-                AppendLog("已打开 ADB 独立命令行交互控制台");
-            }
-            catch { }
         }
 
         private void RestartAdbServer()

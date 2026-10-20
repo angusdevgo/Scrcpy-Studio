@@ -2493,7 +2493,6 @@ namespace ScrcpyStudio
                 btnLaunchPrimary.Enabled = false;
                 btnStopPrimary.Enabled = true;
                 UpdateGlobalStatus(true, "投屏渲染中 (零黑框)");
-                EnsureNavBarVisible();
             }
             catch (Exception ex)
             {

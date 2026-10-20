@@ -17,6 +17,7 @@
 #include "frame_buffer.h"
 #include "input_manager.h"
 #include "mouse_capture.h"
+#include "navbar.h"
 #include "options.h"
 #include "texture.h"
 #include "trait/key_processor.h"
@@ -51,6 +52,7 @@ struct sc_screen {
     struct sc_texture tex;
     struct sc_input_manager im;
     struct sc_mouse_capture mc; // only used in mouse relative mode
+    struct sc_navbar navbar;
     struct sc_fps_counter fps_counter;
 
     struct sc_mutex mutex;

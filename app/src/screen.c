@@ -6,6 +6,7 @@
 
 #include "events.h"
 #include "icon.h"
+#include "navbar.h"
 #include "options.h"
 #include "util/log.h"
 #include "util/sdl.h"
@@ -247,6 +248,13 @@ compute_content_rect(struct sc_size window_size, struct sc_size content_size,
 static void
 sc_screen_update_content_rect(struct sc_screen *screen) {
     struct sc_size window_size = sc_sdl_get_window_size(screen->window);
+    if (screen->video && !screen->camera) {
+        float navbar_height = sc_navbar_get_height(screen->window);
+        if (window_size.height > navbar_height * 2) {
+            // Reserve the bottom strip for the navigation bar
+            window_size.height -= navbar_height;
+        }
+    }
     compute_content_rect(window_size, screen->content_size,
                          screen->is_icon_active, screen->render_fit,
                          &screen->rect);
@@ -340,6 +348,9 @@ sc_screen_render(struct sc_screen *screen, bool update_content_rect) {
     }
 
 end:
+    if (screen->video && !screen->camera && !screen->disconnected) {
+        sc_navbar_render(&screen->navbar, renderer, screen->window);
+    }
     sc_sdl_render_present(renderer);
 }
 
@@ -518,6 +529,8 @@ bool
 sc_screen_init(struct sc_screen *screen,
                const struct sc_screen_params *params) {
     screen->controller = params->controller;
+
+    sc_navbar_init(&screen->navbar);
 
     screen->resize_pending = false;
     screen->window_shown = false;
@@ -1168,8 +1181,43 @@ sc_disconnect_on_timeout(struct sc_disconnect *d, void *userdata) {
     (void) ok; // ignore failure
 }
 
+static void
+sc_screen_inject_key(struct sc_screen *screen, enum android_keycode keycode) {
+    assert(screen->controller);
+
+    struct sc_control_msg msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.type = SC_CONTROL_MSG_TYPE_INJECT_KEYCODE;
+    msg.inject_keycode.keycode = keycode;
+    msg.inject_keycode.repeat = 0;
+    msg.inject_keycode.metastate = 0;
+
+    msg.inject_keycode.action = AKEY_EVENT_ACTION_DOWN;
+    if (!sc_controller_push_msg(screen->controller, &msg)) {
+        LOGW("Could not inject key down (keycode %d)", (int) keycode);
+    }
+
+    msg.inject_keycode.action = AKEY_EVENT_ACTION_UP;
+    if (!sc_controller_push_msg(screen->controller, &msg)) {
+        LOGW("Could not inject key up (keycode %d)", (int) keycode);
+    }
+}
+
 void
 sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
+    if (screen->video && !screen->camera && screen->window_shown
+            && !screen->disconnected && screen->controller) {
+        int keycode;
+        if (sc_navbar_handle_event(&screen->navbar, screen->window, event,
+                                   &keycode)) {
+            if (keycode >= 0) {
+                sc_screen_inject_key(screen, (enum android_keycode) keycode);
+            }
+            sc_screen_render(screen, false);
+            return;
+        }
+    }
+
     switch (event->type) {
         case SC_EVENT_OPEN_WINDOW: {
             struct sc_size *size = event->user.data1;

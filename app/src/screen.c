@@ -15,12 +15,22 @@
 
 #define DOWNCAST(SINK) container_of(SINK, struct sc_screen, frame_sink)
 
+// Height reserved at the bottom of the window for the navigation bar
+static uint32_t
+get_navbar_height(struct sc_screen *screen) {
+    if (!screen->video || screen->camera || !screen->window) {
+        return 0;
+    }
+    return (uint32_t) sc_navbar_get_height(screen->window);
+}
+
 static void
 set_aspect_ratio(struct sc_screen *screen, struct sc_size content_size) {
     assert(content_size.width && content_size.height);
 
     if (screen->window_aspect_ratio_lock) {
-        float ar = (float) content_size.width / content_size.height;
+        uint32_t height = content_size.height + get_navbar_height(screen);
+        float ar = (float) content_size.width / height;
         bool ok = SDL_SetWindowAspectRatio(screen->window, ar, ar);
         if (!ok) {
             LOGW("Could not set window aspect ratio: %s", SDL_GetError());
@@ -805,6 +815,10 @@ sc_screen_show_initial_window(struct sc_screen *screen) {
         sc_screen_track_resize(screen, window_size);
     }
 
+    // Reserve a strip at the bottom for the navigation bar, so that the video
+    // keeps its exact size (no black bars on the sides)
+    window_size.height += get_navbar_height(screen);
+
     assert(is_windowed(screen));
     set_aspect_ratio(screen, screen->content_size);
     sc_sdl_set_window_size(screen->window, window_size);
@@ -892,16 +906,22 @@ resize_for_content(struct sc_screen *screen, struct sc_size old_content_size,
                    struct sc_size new_content_size) {
     assert(screen->video);
 
+    uint32_t navbar_height = get_navbar_height(screen);
+
     struct sc_size target_size = new_content_size;
     if (!screen->flex_display) {
         struct sc_size window_size = sc_sdl_get_window_size(screen->window);
+        uint32_t video_height = window_size.height > navbar_height
+                              ? window_size.height - navbar_height
+                              : window_size.height;
         // Scale proportionally
         target_size.width = (uint32_t) window_size.width * target_size.width
                           / old_content_size.width;
-        target_size.height = (uint32_t) window_size.height * target_size.height
+        target_size.height = (uint32_t) video_height * target_size.height
                            / old_content_size.height;
     }
     target_size = get_optimal_size(target_size, new_content_size, true);
+    target_size.height += navbar_height;
     assert(is_windowed(screen));
     set_aspect_ratio(screen, new_content_size);
     sc_sdl_set_window_size(screen->window, target_size);

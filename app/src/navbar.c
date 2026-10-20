@@ -395,38 +395,14 @@ sc_navbar_render(struct sc_navbar *nb, SDL_Renderer *renderer,
 
     float bar_y = (float) wh_pt - SC_NAVBAR_HEIGHT;
 
-    // Dark translucent background, with rounded top corners
-    const float corner = 18.f;
-    SDL_Color bg = { 13, 16, 22, 244 };
-    SDL_FPoint bar_points[20];
-    int n = 0;
-    // Top-left corner arc (180 -> 270 degrees)
-    for (int i = 0; i <= 5; ++i) {
-        float a = 3.14159265f + 1.5707963f * (float) i / 5.f;
-        bar_points[n].x = corner + SDL_cosf(a) * corner;
-        bar_points[n].y = bar_y + corner + SDL_sinf(a) * corner;
-        ++n;
-    }
-    // Top-right corner arc (270 -> 360 degrees)
-    for (int i = 0; i <= 5; ++i) {
-        float a = 4.71238898f + 1.5707963f * (float) i / 5.f;
-        bar_points[n].x = (float) ww_pt - corner + SDL_cosf(a) * corner;
-        bar_points[n].y = bar_y + corner + SDL_sinf(a) * corner;
-        ++n;
-    }
-    // Bottom corners (below the window edge, no rounding needed)
-    bar_points[n].x = (float) ww_pt;
-    bar_points[n].y = (float) wh_pt + 1;
-    ++n;
-    bar_points[n].x = 0;
-    bar_points[n].y = (float) wh_pt + 1;
-    ++n;
-    fill_fan(renderer, bar_points, n, bg);
+    // Dark background, square corners flush with the window edges
+    SDL_SetRenderDrawColor(renderer, 13, 16, 22, 244);
+    SDL_FRect bar = { 0, bar_y, (float) ww_pt, SC_NAVBAR_HEIGHT };
+    SDL_RenderFillRect(renderer, &bar);
 
     // Accent line along the top edge
-    SDL_SetRenderDrawColor(renderer, 0, 225, 170, 90);
-    SDL_RenderLine(renderer, corner, bar_y + 1,
-                   (float) ww_pt - corner, bar_y + 1);
+    SDL_SetRenderDrawColor(renderer, 0, 225, 170, 80);
+    SDL_RenderLine(renderer, 0, bar_y + 1, (float) ww_pt, bar_y + 1);
 
     SDL_Color icon_normal = { 232, 238, 247, 255 };
     SDL_Color icon_active = { 0, 225, 170, 255 };

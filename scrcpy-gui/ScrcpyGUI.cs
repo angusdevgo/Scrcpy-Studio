@@ -678,6 +678,385 @@ namespace ScrcpyStudio
         }
     }
 
+    // 7. 悬浮导航栏图标按钮（矢量绘制，无字体依赖）
+    public class NavIconButton : Control
+    {
+        public enum NavIcon { Back, Home, Recents, VolumeDown, VolumeUp, Power, Camera, Close }
+
+        private bool _isHovered = false;
+        private bool _isPressed = false;
+
+        public NavIcon IconType { get; set; }
+        public Color IconColor { get; set; }
+        public Color HoverColor { get; set; }
+        public Color PressColor { get; set; }
+
+        public NavIconButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
+                   | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            Size = new Size(40, 40);
+            Cursor = Cursors.Hand;
+            BackColor = Color.Transparent;
+            IconColor = UITheme.TextPrimary;
+            HoverColor = Color.FromArgb(30, 36, 48);
+            PressColor = Color.FromArgb(42, 50, 66);
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { _isHovered = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _isHovered = false; _isPressed = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { _isPressed = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { _isPressed = false; Invalidate(); base.OnMouseUp(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            try
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                if (_isHovered || _isPressed)
+                {
+                    Color bg = _isPressed ? PressColor : HoverColor;
+                    using (GraphicsPath path = Geometry.RoundedRect(new Rectangle(0, 0, Width - 1, Height - 1), 8))
+                    using (SolidBrush brush = new SolidBrush(bg))
+                        g.FillPath(brush, path);
+                }
+
+                Rectangle r = new Rectangle((Width - 20) / 2, (Height - 20) / 2, 20, 20);
+                Color color = _isHovered ? UITheme.Accent : IconColor;
+                DrawIcon(g, IconType, r, color);
+            }
+            catch { }
+        }
+
+        private void DrawIcon(Graphics g, NavIcon icon, Rectangle r, Color color)
+        {
+            int x = r.X;
+            int y = r.Y;
+
+            using (Pen pen = new Pen(color, 1.7f))
+            using (SolidBrush brush = new SolidBrush(color))
+            {
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+                pen.LineJoin = LineJoin.Round;
+
+                switch (icon)
+                {
+                    case NavIcon.Back:
+                        g.DrawLine(pen, x + 12, y + 4, x + 6, y + 10);
+                        g.DrawLine(pen, x + 6, y + 10, x + 12, y + 16);
+                        g.DrawLine(pen, x + 6, y + 10, x + 17, y + 10);
+                        break;
+
+                    case NavIcon.Home:
+                        g.DrawLines(pen, new Point[] {
+                            new Point(x + 3, y + 10), new Point(x + 10, y + 3),
+                            new Point(x + 17, y + 10)
+                        });
+                        g.DrawLines(pen, new Point[] {
+                            new Point(x + 5, y + 9), new Point(x + 5, y + 17),
+                            new Point(x + 15, y + 17), new Point(x + 15, y + 9)
+                        });
+                        break;
+
+                    case NavIcon.Recents:
+                        g.DrawRectangle(pen, x + 3, y + 6, 10, 11);
+                        g.DrawRectangle(pen, x + 7, y + 3, 10, 11);
+                        break;
+
+                    case NavIcon.VolumeDown:
+                    case NavIcon.VolumeUp:
+                        g.FillPolygon(brush, new Point[] {
+                            new Point(x + 3, y + 8), new Point(x + 6, y + 8),
+                            new Point(x + 10, y + 4), new Point(x + 10, y + 16),
+                            new Point(x + 6, y + 12), new Point(x + 3, y + 12)
+                        });
+                        g.DrawLine(pen, x + 12, y + 10, x + 17, y + 10);
+                        if (icon == NavIcon.VolumeUp)
+                        {
+                            g.DrawLine(pen, x + 14.5f, y + 7.5f, x + 14.5f, y + 12.5f);
+                        }
+                        break;
+
+                    case NavIcon.Power:
+                        g.DrawArc(pen, x + 4, y + 4, 12, 12, -60, 300);
+                        g.DrawLine(pen, x + 10, y + 2, x + 10, y + 9);
+                        break;
+
+                    case NavIcon.Camera:
+                        using (GraphicsPath body = Geometry.RoundedRect(new Rectangle(x + 2, y + 6, 16, 11), 3))
+                            g.DrawPath(pen, body);
+                        g.DrawEllipse(pen, x + 7, y + 8, 6, 6);
+                        g.DrawLine(pen, x + 7, y + 6, x + 8, y + 4);
+                        g.DrawLine(pen, x + 8, y + 4, x + 12, y + 4);
+                        g.DrawLine(pen, x + 12, y + 4, x + 13, y + 6);
+                        break;
+
+                    case NavIcon.Close:
+                        g.DrawLine(pen, x + 5, y + 5, x + 15, y + 15);
+                        g.DrawLine(pen, x + 15, y + 5, x + 5, y + 15);
+                        break;
+                }
+            }
+        }
+    }
+
+    // 8. 悬浮系统导航栏（置顶 / 不抢焦点 / 可拖动 / 记忆位置）
+    public class FloatingNavBar : Form
+    {
+        [DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+        [DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+        private const int WM_NCLBUTTONDOWN = 0xA1;
+        private const int HT_CAPTION = 0x2;
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+        private const int WS_EX_TOOLWINDOW = 0x00000080;
+
+        public Func<string> GetSerial;
+        public Action<string> RunShell;
+        public Action OnScreenshot;
+        public Action<string> OnLog;
+
+        private ToolTip _tip;
+        private Panel _grip;
+        private bool _dragSaving = false;
+
+        public FloatingNavBar()
+        {
+            AutoScaleMode = AutoScaleMode.None;
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = FormStartPosition.Manual;
+            BackColor = UITheme.CardBg;
+            DoubleBuffered = true;
+            Size = new Size(380, 56);
+            Text = "Scrcpy Studio 悬浮导航栏";
+
+            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint
+                   | ControlStyles.OptimizedDoubleBuffer, true);
+
+            _tip = new ToolTip();
+            _tip.InitialDelay = 300;
+            _tip.ReshowDelay = 100;
+
+            BuildBar();
+        }
+
+        protected override bool ShowWithoutActivation { get { return true; } }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_NOACTIVATE;  // 点击不抢走投屏窗口焦点
+                cp.ExStyle |= WS_EX_TOOLWINDOW;  // 不出现在 Alt+Tab
+                return cp;
+            }
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            using (GraphicsPath path = Geometry.RoundedRect(new Rectangle(0, 0, Width, Height), 14))
+            {
+                Region old = Region;
+                Region = new Region(path);
+                if (old != null) old.Dispose();
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            try
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
+                using (GraphicsPath path = Geometry.RoundedRect(rect, 14))
+                using (SolidBrush brush = new SolidBrush(UITheme.CardBg))
+                using (Pen pen = new Pen(UITheme.CardBorder, 1.2f))
+                {
+                    g.FillPath(brush, path);
+                    g.DrawPath(pen, path);
+                }
+
+                // 顶部极光装饰线
+                using (Pen accent = new Pen(Color.FromArgb(90, UITheme.Accent), 1.4f))
+                {
+                    accent.StartCap = LineCap.Round;
+                    accent.EndCap = LineCap.Round;
+                    g.DrawLine(accent, 24, 1, Width - 24, 1);
+                }
+            }
+            catch { }
+        }
+
+        private void BuildBar()
+        {
+            _grip = new Panel
+            {
+                Location = new Point(4, 4),
+                Size = new Size(20, Height - 8),
+                BackColor = Color.Transparent,
+                Cursor = Cursors.SizeAll
+            };
+            _grip.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using (SolidBrush b = new SolidBrush(UITheme.TextMuted))
+                {
+                    for (int row = 0; row < 3; row++)
+                    {
+                        for (int col = 0; col < 2; col++)
+                        {
+                            g.FillEllipse(b, 6 + col * 6, 17 + row * 6, 2.4f, 2.4f);
+                        }
+                    }
+                }
+            };
+            _grip.MouseDown += DragWindow;
+            Controls.Add(_grip);
+
+            int x = 26;
+            AddButton(NavIconButton.NavIcon.Back, x, "返回 (Back)", delegate { SendKey(4, "返回"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.Home, x, "主页 (Home)", delegate { SendKey(3, "主页"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.Recents, x, "最近任务 (Recents)", delegate { SendKey(187, "最近任务"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.VolumeDown, x, "音量减小", delegate { SendKey(25, "音量减小"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.VolumeUp, x, "音量增加", delegate { SendKey(24, "音量增加"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.Power, x, "电源键 (锁屏/亮屏)", delegate { SendKey(26, "电源键"); });
+            x += 44;
+            AddButton(NavIconButton.NavIcon.Camera, x, "高清截屏到本地", delegate
+            {
+                if (OnScreenshot != null) OnScreenshot();
+            });
+
+            Panel separator = new Panel
+            {
+                Location = new Point(338, 14),
+                Size = new Size(1, 28),
+                BackColor = UITheme.InnerBorder
+            };
+            Controls.Add(separator);
+
+            NavIconButton btnClose = new NavIconButton
+            {
+                IconType = NavIconButton.NavIcon.Close,
+                Location = new Point(344, 8),
+                Size = new Size(30, 30),
+                IconColor = UITheme.TextSecondary
+            };
+            btnClose.Click += (s, e) => Close();
+            _tip.SetToolTip(btnClose, "关闭导航栏");
+            Controls.Add(btnClose);
+
+            // 空白区域也可拖动
+            MouseDown += DragWindow;
+        }
+
+        private void AddButton(NavIconButton.NavIcon icon, int x, string tip, EventHandler onClick)
+        {
+            NavIconButton btn = new NavIconButton
+            {
+                IconType = icon,
+                Location = new Point(x, 8)
+            };
+            btn.Click += onClick;
+            _tip.SetToolTip(btn, tip);
+            Controls.Add(btn);
+        }
+
+        private void DragWindow(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            ReleaseCapture();
+            SendMessage(Handle, WM_NCLBUTTONDOWN, HT_CAPTION, 0);
+            _dragSaving = true;
+        }
+
+        private void SendKey(int keyCode, string name)
+        {
+            if (RunShell == null) return;
+            RunShell("input keyevent " + keyCode);
+            if (OnLog != null)
+                OnLog("[导航栏] 已发送 " + name + " (KeyCode " + keyCode + ")");
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            LoadPosition();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (_dragSaving)
+            {
+                _dragSaving = false;
+                SavePosition();
+            }
+        }
+
+        private string PositionFile
+        {
+            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "navbar_pos.cfg"); }
+        }
+
+        private void LoadPosition()
+        {
+            bool restored = false;
+            try
+            {
+                if (File.Exists(PositionFile))
+                {
+                    string[] parts = File.ReadAllText(PositionFile).Trim().Split(',');
+                    int px, py;
+                    if (parts.Length == 2 && int.TryParse(parts[0], out px) && int.TryParse(parts[1], out py))
+                    {
+                        Rectangle probe = new Rectangle(px, py, Width, Height);
+                        foreach (Screen scr in Screen.AllScreens)
+                        {
+                            if (scr.WorkingArea.IntersectsWith(probe))
+                            {
+                                Location = new Point(px, py);
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (!restored)
+            {
+                Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+                Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Bottom - Height - 56);
+            }
+        }
+
+        private void SavePosition()
+        {
+            try
+            {
+                File.WriteAllText(PositionFile, Location.X + "," + Location.Y);
+            }
+            catch { }
+        }
+    }
+
     #endregion
 
     #region 主窗体 (1180×740 旗舰级宽屏 Studio)
@@ -721,6 +1100,10 @@ namespace ScrcpyStudio
 
         private StudioButton btnLaunchPrimary;
         private StudioButton btnStopPrimary;
+
+        // 悬浮系统导航栏
+        private FloatingNavBar navBar;
+        private StudioButton btnNavBarToggle;
 
         // Display 控件
         private StudioComboBox comboResolution;
@@ -1315,7 +1698,16 @@ namespace ScrcpyStudio
             };
             btnQuickRestartAdb.Click += (s, e) => RestartAdbServer();
 
-            cardQuickTools.Controls.AddRange(new Control[] { lblToolHint, btnQuickCap, btnQuickWake, btnQuickTerm, btnQuickRestartAdb });
+            btnNavBarToggle = new StudioButton
+            {
+                Text = "🧭 悬浮导航栏",
+                Location = new Point(730, 16),
+                Size = new Size(134, 36),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnNavBarToggle.Click += (s, e) => ToggleNavBar();
+
+            cardQuickTools.Controls.AddRange(new Control[] { lblToolHint, btnQuickCap, btnQuickWake, btnQuickTerm, btnQuickRestartAdb, btnNavBarToggle });
             pnl.Controls.Add(cardQuickTools);
 
             return pnl;
@@ -2101,6 +2493,7 @@ namespace ScrcpyStudio
                 btnLaunchPrimary.Enabled = false;
                 btnStopPrimary.Enabled = true;
                 UpdateGlobalStatus(true, "投屏渲染中 (零黑框)");
+                EnsureNavBarVisible();
             }
             catch (Exception ex)
             {
@@ -2130,6 +2523,70 @@ namespace ScrcpyStudio
             lblGlobalStatus.Text = text;
             lblStatusDot.ForeColor = ok ? UITheme.Success : UITheme.Danger;
         }
+
+        #region 悬浮系统导航栏控制
+
+        private void ToggleNavBar()
+        {
+            if (navBar == null || navBar.IsDisposed)
+                EnsureNavBarVisible();
+            else
+                CloseNavBar();
+        }
+
+        private void EnsureNavBarVisible()
+        {
+            if (navBar != null && !navBar.IsDisposed)
+            {
+                if (!navBar.Visible)
+                    navBar.Show();
+                navBar.BringToFront();
+                UpdateNavBarButton();
+                return;
+            }
+
+            navBar = new FloatingNavBar();
+            navBar.GetSerial = delegate { return (comboDevices.SelectedItem == null) ? null : comboDevices.SelectedItem.ToString(); };
+            navBar.RunShell = delegate(string cmd) { RunAdbShell(cmd); };
+            navBar.OnScreenshot = delegate { TakeDeviceScreenshot(); };
+            navBar.OnLog = delegate(string msg) { AppendLog(msg); };
+            navBar.FormClosed += delegate { UpdateNavBarButton(); };
+            navBar.Show();
+            UpdateNavBarButton();
+            AppendLog("悬浮导航栏已启动：置顶显示且不抢焦点，可直接点击返回 / 主页 / 最近任务");
+        }
+
+        private void CloseNavBar()
+        {
+            if (navBar != null && !navBar.IsDisposed)
+            {
+                FloatingNavBar nb = navBar;
+                navBar = null;
+                nb.Close();
+                nb.Dispose();
+            }
+            UpdateNavBarButton();
+        }
+
+        private void UpdateNavBarButton()
+        {
+            if (btnNavBarToggle == null || btnNavBarToggle.IsDisposed) return;
+            bool visible = navBar != null && !navBar.IsDisposed && navBar.Visible;
+            btnNavBarToggle.Text = visible ? "🧭 隐藏导航栏" : "🧭 悬浮导航栏";
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (navBar != null && !navBar.IsDisposed)
+            {
+                navBar.Close();
+                navBar.Dispose();
+                navBar = null;
+            }
+            base.OnFormClosing(e);
+        }
+
+        #endregion
 
         #endregion
     }

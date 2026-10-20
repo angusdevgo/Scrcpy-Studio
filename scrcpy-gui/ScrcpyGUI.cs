@@ -43,25 +43,25 @@ namespace ScrcpyStudio
         public static readonly Color TextWhite      = Color.FromArgb(255, 255, 255);
         public static readonly Color TextPrimary    = Color.FromArgb(240, 243, 248);
         public static readonly Color TextSecondary  = Color.FromArgb(150, 160, 175);
-        public static readonly Color TextMuted      = Color.FromArgb(95, 105, 120);
+        public static readonly Color TextMuted      = Color.FromArgb(100, 110, 128);
         public static readonly Color TextDisabled   = Color.FromArgb(65, 72, 85);
 
         // 字体层次规范
         public static Font FontPageTitle   = new Font("Segoe UI", 15F, FontStyle.Bold);
         public static Font FontPageSub     = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular);
         public static Font FontCardHeader  = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Bold);
-        public static Font FontItemTitle   = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
-        public static Font FontItemSub     = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular);
+        public static Font FontItemTitle   = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+        public static Font FontItemSub     = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Regular);
         public static Font FontBody        = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular);
         public static Font FontBodyBold    = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
-        public static Font FontMono        = new Font("Consolas", 10F, FontStyle.Regular);
+        public static Font FontMono        = new Font("Consolas", 9.5F, FontStyle.Regular);
         public static Font FontSmall       = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Regular);
     }
     #endregion
 
     #region 高清自绘组件库
 
-    // 1. 宽幅沉浸圆角卡片
+    // 1. 沉浸圆角卡片 StudioCard
     public class StudioCard : Panel
     {
         public int Radius { get; set; }
@@ -118,14 +118,20 @@ namespace ScrcpyStudio
                 {
                     _selectedIndex = value;
                     Invalidate();
-                    if (SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty);
+                    if (SelectedIndexChanged != null)
+                        SelectedIndexChanged(this, EventArgs.Empty);
                 }
             }
         }
 
         public string SelectedItem
         {
-            get { return (_selectedIndex >= 0 && _selectedIndex < _items.Count) ? _items[_selectedIndex] : null; }
+            get
+            {
+                if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
+                    return _items[_selectedIndex];
+                return null;
+            }
             set
             {
                 int idx = _items.IndexOf(value);
@@ -135,11 +141,10 @@ namespace ScrcpyStudio
 
         public StudioComboBox()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            Size = new Size(340, 38);
-            Font = UITheme.FontBody;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
+            Size = new Size(200, 36);
             Cursor = Cursors.Hand;
-            BackColor = UITheme.InputBg;
+            Font = UITheme.FontBody;
         }
 
         protected override void OnMouseEnter(EventArgs e) { _isHovered = true; Invalidate(); base.OnMouseEnter(e); }
@@ -148,18 +153,19 @@ namespace ScrcpyStudio
         protected override void OnClick(EventArgs e)
         {
             base.OnClick(e);
-            ToggleDropdown();
+            if (_isDropped)
+                CloseDropdown();
+            else
+                ShowDropdown();
         }
 
-        private void ToggleDropdown()
+        private void ShowDropdown()
         {
-            if (_isDropped)
-            {
-                CloseDropdown();
-                return;
-            }
-
             if (_items.Count == 0) return;
+
+            Point screenPt = this.PointToScreen(new Point(0, this.Height + 2));
+            int itemHeight = 34;
+            int dropHeight = Math.Min(_items.Count * itemHeight + 6, 260);
 
             _dropForm = new Form
             {
@@ -167,13 +173,8 @@ namespace ScrcpyStudio
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = false,
                 TopMost = true,
-                BackColor = UITheme.CardBorder,
-                Padding = new Padding(1)
+                BackColor = UITheme.CardBg
             };
-
-            int itemHeight = 34;
-            int dropHeight = Math.Min(_items.Count * itemHeight + 6, 240);
-            Point screenPt = PointToScreen(new Point(0, Height + 2));
 
             _dropListBox = new ListBox
             {
@@ -182,13 +183,15 @@ namespace ScrcpyStudio
                 ForeColor = UITheme.TextPrimary,
                 Font = this.Font,
                 BorderStyle = BorderStyle.None,
-                ItemHeight = itemHeight,
                 DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = itemHeight,
                 IntegralHeight = false
             };
 
-            foreach (var it in _items) _dropListBox.Items.Add(it);
-            if (_selectedIndex >= 0 && _selectedIndex < _dropListBox.Items.Count)
+            foreach (var item in _items)
+                _dropListBox.Items.Add(item);
+
+            if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
                 _dropListBox.SelectedIndex = _selectedIndex;
 
             _dropListBox.DrawItem += (s, e) =>
@@ -196,9 +199,8 @@ namespace ScrcpyStudio
                 if (e.Index < 0 || e.Index >= _items.Count) return;
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-                bool isSel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
 
+                bool isSel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bg = isSel ? Color.FromArgb(28, 34, 46) : UITheme.CardBg;
                 Color fg = isSel ? UITheme.Accent : UITheme.TextPrimary;
 
@@ -231,7 +233,6 @@ namespace ScrcpyStudio
 
             _dropForm.Deactivate += (s, e) =>
             {
-                // 延迟关闭，避免与 Click 事件重入造成空指针
                 this.BeginInvoke(new Action(() => CloseDropdown()));
             };
 
@@ -317,7 +318,7 @@ namespace ScrcpyStudio
     // 3. 现代交互按钮 StudioButton
     public class StudioButton : Control
     {
-        public enum ButtonStyle { Accent, Danger, Secondary, Ghost }
+        public enum ButtonStyle { Accent, Danger, Secondary, Ghost, CloseGhost }
 
         private bool _isHovered = false;
         private bool _isPressed = false;
@@ -333,7 +334,7 @@ namespace ScrcpyStudio
             ForeColor = UITheme.TextWhite;
             Radius = 6;
             Style = ButtonStyle.Accent;
-            Size = new Size(130, 40);
+            Size = new Size(130, 38);
         }
 
         protected override void OnMouseEnter(EventArgs e) { _isHovered = true; Invalidate(); base.OnMouseEnter(e); }
@@ -380,6 +381,10 @@ namespace ScrcpyStudio
                             bg = _isPressed ? Color.FromArgb(30, 36, 48) : (_isHovered ? Color.FromArgb(22, 26, 34) : Color.Transparent);
                             fg = _isHovered ? UITheme.TextWhite : UITheme.TextSecondary;
                             break;
+                        case ButtonStyle.CloseGhost:
+                            bg = _isPressed ? Color.FromArgb(180, 10, 20) : (_isHovered ? Color.FromArgb(232, 17, 35) : Color.Transparent);
+                            fg = _isHovered ? Color.White : UITheme.TextSecondary;
+                            break;
                     }
                 }
 
@@ -402,7 +407,7 @@ namespace ScrcpyStudio
         }
     }
 
-    // 4. 极简青光胶囊开关 StudioToggle
+    // 4. 自绘极简胶囊开关 StudioToggle
     public class StudioToggle : Control
     {
         private bool _checked = false;
@@ -460,7 +465,70 @@ namespace ScrcpyStudio
         }
     }
 
-    // 5. 侧边栏导航 Tab
+    // 5. 现代化自绘输入框 StudioTextBox (解决 WinForms 原生输入框丑陋与高度固定问题)
+    public class StudioTextBox : Panel
+    {
+        private TextBox _inner;
+        private bool _isFocused = false;
+
+        public string Text
+        {
+            get { return _inner.Text; }
+            set { _inner.Text = value; }
+        }
+
+        public TextBox InnerTextBox { get { return _inner; } }
+
+        public StudioTextBox()
+        {
+            Size = new Size(200, 36);
+            BackColor = UITheme.InputBg;
+            DoubleBuffered = true;
+
+            _inner = new TextBox
+            {
+                BorderStyle = BorderStyle.None,
+                BackColor = UITheme.InputBg,
+                ForeColor = UITheme.TextWhite,
+                Font = UITheme.FontMono,
+                Location = new Point(12, 9),
+                Width = Width - 24
+            };
+
+            _inner.GotFocus += (s, e) => { _isFocused = true; Invalidate(); };
+            _inner.LostFocus += (s, e) => { _isFocused = false; Invalidate(); };
+            Controls.Add(_inner);
+        }
+
+        protected override void OnResize(EventArgs eventargs)
+        {
+            base.OnResize(eventargs);
+            if (_inner != null)
+            {
+                _inner.Width = Width - 24;
+                _inner.Location = new Point(12, (Height - _inner.PreferredHeight) / 2);
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            Color border = _isFocused ? UITheme.Accent : UITheme.InputBorder;
+
+            using (GraphicsPath path = Geometry.RoundedRect(rect, 6))
+            using (SolidBrush brush = new SolidBrush(UITheme.InputBg))
+            using (Pen pen = new Pen(border, _isFocused ? 1.5f : 1.2f))
+            {
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
+            }
+        }
+    }
+
+    // 6. 侧边栏导航 Tab
     public class StudioNavTab : Control
     {
         public enum TabIconType { Device, Video, Tools, Engine }
@@ -481,7 +549,7 @@ namespace ScrcpyStudio
         {
             IconType = iconType;
             TabName = name;
-            Size = new Size(216, 48);
+            Size = new Size(206, 46);
             Cursor = Cursors.Hand;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
@@ -530,7 +598,7 @@ namespace ScrcpyStudio
                     }
                 }
 
-                DrawVectorIcon(g, IconType, 18, 15, iconColor);
+                DrawVectorIcon(g, IconType, 18, 14, iconColor);
 
                 Rectangle textRect = new Rectangle(52, 0, Width - 56, Height);
                 TextRenderer.DrawText(g, TabName, _isSelected ? UITheme.FontBodyBold : UITheme.FontBody, textRect, fg, 
@@ -625,19 +693,24 @@ namespace ScrcpyStudio
         private Panel contentWrapper;
         private List<StudioNavTab> navTabs = new List<StudioNavTab>();
 
+        // 4 大功能主分页
         private Panel pageDashboard;
         private Panel pageDisplay;
+        private Panel pageTools;
+        private Panel pageSettings;
 
         private Label lblHeaderTitle;
         private Label lblHeaderSubtitle;
 
+        // Dashboard 控件
         private Label lblDeviceBadge;
         private Label lblDeviceSerial;
         private Label lblDeviceSubInfo;
         private StudioComboBox comboDevices;
         private StudioButton btnRefreshDev;
-        private TextBox txtWirelessIp;
+        private StudioTextBox txtWirelessIp;
         private StudioButton btnWirelessConnect;
+        private StudioButton btnAdbTcpip;
 
         private StudioToggle togScreenOff;
         private StudioToggle togAlwaysOnTop;
@@ -649,31 +722,33 @@ namespace ScrcpyStudio
         private StudioButton btnLaunchPrimary;
         private StudioButton btnStopPrimary;
 
+        // Display 控件
         private StudioComboBox comboResolution;
         private StudioComboBox comboFps;
         private StudioComboBox comboBitrate;
         private StudioComboBox comboCodec;
+        private StudioComboBox comboAudioCodec;
+        private StudioComboBox comboAudioBitrate;
+        private StudioComboBox comboBuffer;
+        private StudioComboBox comboRecord;
 
+        // Settings 控件
+        private Label lblScrcpyPathVal;
+        private Label lblAdbPathVal;
+        private Label lblScrcpyStatus;
+        private Label lblAdbStatus;
+        private TextBox txtLogMonitor;
 
-
-        private Label lblGlobalStatus;
+        // 底部全局状态
         private Label lblStatusDot;
+        private Label lblGlobalStatus;
 
         [DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
         [DllImport("user32.dll")]
         public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-        [DllImport("user32.dll")]
-        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-        [DllImport("user32.dll")]
-        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-
         private const int WM_NCLBUTTONDOWN = 0xA1;
         private const int HT_CAPTION = 0x2;
-
-
 
         public MainForm()
         {
@@ -700,6 +775,16 @@ namespace ScrcpyStudio
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
 
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            // 绘制 1px 极细深色外边框，保证在深色/浅色壁纸下均有立体感
+            using (Pen pen = new Pen(UITheme.CardBorder, 1f))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            }
+        }
+
         private void LoadApplicationIcon()
         {
             string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
@@ -713,6 +798,7 @@ namespace ScrcpyStudio
             }
             catch { }
         }
+
         private void DetectScrcpyEngine()
         {
             string cfgFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrcpy_gui.cfg");
@@ -728,9 +814,9 @@ namespace ScrcpyStudio
 
             string[] candidates = new string[]
             {
-                @"D:\Data\Scrcpy\scrcpy.exe",
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrcpy.exe"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\scrcpy.exe"),
+                @"D:\Data\Scrcpy\scrcpy.exe",
                 @"C:\Data\Scrcpy\scrcpy.exe",
                 @"C:\scrcpy\scrcpy.exe"
             };
@@ -739,19 +825,56 @@ namespace ScrcpyStudio
             {
                 if (File.Exists(p)) { SetCorePath(Path.GetFullPath(p)); return; }
             }
+
+            // 找不到则保留默认相对路径
+            SetCorePath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrcpy.exe"));
         }
 
         private void SetCorePath(string path)
         {
             scrcpyExePath = path;
             string dir = Path.GetDirectoryName(path);
-            string adb = Path.Combine(dir, "adb.exe");
-            adbExePath = File.Exists(adb) ? adb : "adb";
+            if (!string.IsNullOrEmpty(dir))
+            {
+                string adb = Path.Combine(dir, "adb.exe");
+                adbExePath = File.Exists(adb) ? adb : "adb";
+            }
+            else
+            {
+                adbExePath = "adb";
+            }
+
             try
             {
                 File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrcpy_gui.cfg"), path);
             }
             catch { }
+
+            UpdateEngineStatusDisplay();
+        }
+
+        private void UpdateEngineStatusDisplay()
+        {
+            if (lblScrcpyPathVal != null)
+                lblScrcpyPathVal.Text = string.IsNullOrEmpty(scrcpyExePath) ? "未指定" : scrcpyExePath;
+
+            if (lblAdbPathVal != null)
+                lblAdbPathVal.Text = string.IsNullOrEmpty(adbExePath) ? "未指定" : adbExePath;
+
+            bool scrcpyOk = File.Exists(scrcpyExePath);
+            bool adbOk = File.Exists(adbExePath) || adbExePath == "adb";
+
+            if (lblScrcpyStatus != null)
+            {
+                lblScrcpyStatus.Text = scrcpyOk ? "● 引擎就绪" : "● 核心缺失";
+                lblScrcpyStatus.ForeColor = scrcpyOk ? UITheme.Success : UITheme.Danger;
+            }
+
+            if (lblAdbStatus != null)
+            {
+                lblAdbStatus.Text = adbOk ? "● 服务就绪" : "● 未找到 ADB";
+                lblAdbStatus.ForeColor = adbOk ? UITheme.Success : UITheme.Warning;
+            }
         }
 
         private void BuildCustomTitleBar()
@@ -773,11 +896,11 @@ namespace ScrcpyStudio
 
             Label title = new Label
             {
-                Text = "Scrcpy Studio · 极光现代化控制工作台",
+                Text = "⚡ Scrcpy Studio · 极光现代化控制工作台",
                 Font = UITheme.FontBodyBold,
                 ForeColor = UITheme.TextSecondary,
                 BackColor = UITheme.TitleBarBg,
-                Location = new Point(20, 11),
+                Location = new Point(16, 12),
                 AutoSize = true
             };
             title.MouseDown += (s, e) =>
@@ -802,7 +925,7 @@ namespace ScrcpyStudio
             StudioButton btnClose = new StudioButton
             {
                 Text = "✕",
-                Style = StudioButton.ButtonStyle.Ghost,
+                Style = StudioButton.ButtonStyle.CloseGhost,
                 Location = new Point(1132, 4),
                 Size = new Size(42, 34),
                 Radius = 4
@@ -818,11 +941,11 @@ namespace ScrcpyStudio
             sidebarPanel = new Panel
             {
                 Location = new Point(0, 42),
-                Size = new Size(240, 698),
+                Size = new Size(230, 698),
                 BackColor = UITheme.SidebarBg
             };
 
-            Panel brand = new Panel { Location = new Point(16, 16), Size = new Size(208, 54), BackColor = UITheme.SidebarBg };
+            Panel brand = new Panel { Location = new Point(16, 16), Size = new Size(198, 54), BackColor = UITheme.SidebarBg };
             Label lblLogo = new Label
             {
                 Text = "SCRCPY PRO",
@@ -844,32 +967,34 @@ namespace ScrcpyStudio
             brand.Controls.AddRange(new Control[] { lblLogo, lblVer });
             sidebarPanel.Controls.Add(brand);
 
-            Panel line = new Panel { Location = new Point(16, 78), Size = new Size(208, 1), BackColor = UITheme.InnerBorder };
+            Panel line = new Panel { Location = new Point(16, 78), Size = new Size(198, 1), BackColor = UITheme.InnerBorder };
             sidebarPanel.Controls.Add(line);
 
-            int startY = 94;
+            int startY = 92;
             StudioNavTab.TabIconType[] icons = new StudioNavTab.TabIconType[] {
                 StudioNavTab.TabIconType.Device,
-                StudioNavTab.TabIconType.Video
+                StudioNavTab.TabIconType.Video,
+                StudioNavTab.TabIconType.Tools,
+                StudioNavTab.TabIconType.Engine
             };
-            string[] names = new string[] { "投屏工作台", "画质与帧率" };
+            string[] names = new string[] { "投屏工作台", "画质与性能", "实用工具箱", "引擎与设置" };
 
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 4; i++)
             {
                 int index = i;
                 StudioNavTab tab = new StudioNavTab(icons[i], names[i])
                 {
                     Location = new Point(12, startY),
-                    Width = 216,
-                    Height = 48
+                    Width = 206,
+                    Height = 46
                 };
                 tab.Click += (s, e) => SelectNavTab(index);
                 sidebarPanel.Controls.Add(tab);
                 navTabs.Add(tab);
-                startY += 56;
+                startY += 52;
             }
 
-            Panel bottomStatus = new Panel { Location = new Point(16, 642), Size = new Size(208, 40), BackColor = UITheme.SidebarBg };
+            Panel bottomStatus = new Panel { Location = new Point(16, 642), Size = new Size(198, 40), BackColor = UITheme.SidebarBg };
             lblStatusDot = new Label
             {
                 Text = "●",
@@ -898,12 +1023,12 @@ namespace ScrcpyStudio
         {
             contentWrapper = new Panel
             {
-                Location = new Point(240, 42),
-                Size = new Size(940, 698),
+                Location = new Point(230, 42),
+                Size = new Size(950, 698),
                 BackColor = UITheme.WindowBg
             };
 
-            Panel headerPnl = new Panel { Location = new Point(32, 18), Size = new Size(876, 56), BackColor = UITheme.WindowBg };
+            Panel headerPnl = new Panel { Location = new Point(32, 14), Size = new Size(886, 54), BackColor = UITheme.WindowBg };
             lblHeaderTitle = new Label
             {
                 Text = "投屏控制工作台",
@@ -919,7 +1044,7 @@ namespace ScrcpyStudio
                 Font = UITheme.FontPageSub,
                 ForeColor = UITheme.TextSecondary,
                 BackColor = UITheme.WindowBg,
-                Location = new Point(2, 32),
+                Location = new Point(2, 30),
                 AutoSize = true
             };
             headerPnl.Controls.AddRange(new Control[] { lblHeaderTitle, lblHeaderSubtitle });
@@ -927,8 +1052,10 @@ namespace ScrcpyStudio
 
             pageDashboard = CreatePageDashboard();
             pageDisplay = CreatePageDisplay();
+            pageTools = CreatePageTools();
+            pageSettings = CreatePageSettings();
 
-            contentWrapper.Controls.AddRange(new Control[] { pageDashboard, pageDisplay });
+            contentWrapper.Controls.AddRange(new Control[] { pageDashboard, pageDisplay, pageTools, pageSettings });
             Controls.Add(contentWrapper);
         }
 
@@ -939,23 +1066,29 @@ namespace ScrcpyStudio
 
             pageDashboard.Visible = (index == 0);
             pageDisplay.Visible = (index == 1);
+            pageTools.Visible = (index == 2);
+            pageSettings.Visible = (index == 3);
 
-            string[] titles = { "投屏控制工作台", "画质与性能调校" };
+            string[] titles = { "投屏控制工作台", "画质与性能调校", "实用辅助工具箱", "引擎与环境配置" };
             string[] subs = {
                 "实时监控已连接的 Android 调试设备并启动零延迟超清投屏",
-                "自定义最高分辨率、极限 120 FPS 帧率以及下一代硬件编解码方案"
+                "自定义最高分辨率、极限 120 FPS 帧率、硬件编解码与多媒体流控",
+                "快捷触发手机物理按键、实时截屏、剪贴板文本同步与系统调试",
+                "管理底层 scrcpy.exe 核心路径、ADB 服务守护状态与终端实时日志"
             };
 
             lblHeaderTitle.Text = titles[index];
             lblHeaderSubtitle.Text = subs[index];
         }
 
+        #region Page 1: 投屏工作台 Dashboard
+
         private Panel CreatePageDashboard()
         {
-            Panel pnl = new Panel { Location = new Point(32, 82), Size = new Size(876, 595), BackColor = UITheme.WindowBg };
+            Panel pnl = new Panel { Location = new Point(32, 74), Size = new Size(886, 610), BackColor = UITheme.WindowBg };
 
             // 1. 设备连接状态卡片
-            StudioCard cardDev = new StudioCard { Location = new Point(0, 0), Size = new Size(876, 130) };
+            StudioCard cardDev = new StudioCard { Location = new Point(0, 0), Size = new Size(886, 126) };
             
             lblDeviceBadge = new Label
             {
@@ -969,7 +1102,7 @@ namespace ScrcpyStudio
             lblDeviceSerial = new Label
             {
                 Text = "正在扫描设备...",
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
                 ForeColor = UITheme.TextWhite,
                 BackColor = UITheme.CardBg,
                 Location = new Point(22, 40),
@@ -987,94 +1120,204 @@ namespace ScrcpyStudio
 
             comboDevices = new StudioComboBox
             {
-                Location = new Point(380, 24),
-                Width = 310
+                Location = new Point(350, 22),
+                Width = 360
             };
 
             btnRefreshDev = new StudioButton
             {
                 Text = "刷新设备",
-                Location = new Point(706, 23),
-                Size = new Size(146, 38),
+                Location = new Point(724, 21),
+                Size = new Size(140, 38),
                 Style = StudioButton.ButtonStyle.Secondary
             };
             btnRefreshDev.Click += (s, e) => RefreshDeviceList();
 
-            Label lblIp = new Label { Text = "无线 IP 地址:", Location = new Point(380, 79), AutoSize = true, ForeColor = UITheme.TextSecondary, BackColor = UITheme.CardBg, Font = UITheme.FontBody };
-            txtWirelessIp = new TextBox
+            Label lblIp = new Label
             {
-                Location = new Point(480, 76),
-                Width = 210,
-                Text = "192.168.1.",
-                Font = UITheme.FontMono,
-                BackColor = UITheme.InputBg,
-                ForeColor = UITheme.TextWhite,
-                BorderStyle = BorderStyle.FixedSingle
+                Text = "无线 IP :",
+                Location = new Point(350, 78),
+                AutoSize = true,
+                ForeColor = UITheme.TextSecondary,
+                BackColor = UITheme.CardBg,
+                Font = UITheme.FontBody
             };
+
+            txtWirelessIp = new StudioTextBox
+            {
+                Location = new Point(416, 73),
+                Size = new Size(210, 38)
+            };
+            txtWirelessIp.Text = "192.168.1.";
+
+            btnAdbTcpip = new StudioButton
+            {
+                Text = "开启 TCP/IP",
+                Location = new Point(634, 73),
+                Size = new Size(110, 38),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnAdbTcpip.Click += BtnAdbTcpip_Click;
 
             btnWirelessConnect = new StudioButton
             {
-                Text = "无线配对",
-                Location = new Point(706, 73),
-                Size = new Size(146, 38),
+                Text = "无线连接",
+                Location = new Point(752, 73),
+                Size = new Size(112, 38),
                 Style = StudioButton.ButtonStyle.Accent
             };
             btnWirelessConnect.Click += BtnWirelessConnect_Click;
 
-            cardDev.Controls.AddRange(new Control[] { lblDeviceBadge, lblDeviceSerial, lblDeviceSubInfo, comboDevices, btnRefreshDev, lblIp, txtWirelessIp, btnWirelessConnect });
+            cardDev.Controls.AddRange(new Control[] { lblDeviceBadge, lblDeviceSerial, lblDeviceSubInfo, comboDevices, btnRefreshDev, lblIp, txtWirelessIp, btnAdbTcpip, btnWirelessConnect });
             pnl.Controls.Add(cardDev);
 
-            // 2. 快捷开关卡片 (双列舒展布局)
-            StudioCard cardSw = new StudioCard { Location = new Point(0, 146), Size = new Size(876, 260) };
+            // 2. 快捷特性开关卡片 (双列优雅自排布)
+            StudioCard cardSw = new StudioCard { Location = new Point(0, 138), Size = new Size(886, 230) };
             Label lblSwTitle = new Label
             {
                 Text = "快捷特性与渲染策略 (Quick Features)",
                 Font = UITheme.FontCardHeader,
                 ForeColor = UITheme.TextWhite,
                 BackColor = UITheme.CardBg,
-                Location = new Point(22, 18),
+                Location = new Point(22, 16),
                 AutoSize = true
             };
             cardSw.Controls.Add(lblSwTitle);
 
             int col1 = 22, col2 = 460;
-            int rY1 = 60, rY2 = 124, rY3 = 188;
+            int rY1 = 52, rY2 = 110, rY3 = 168;
 
-            AddSwitchItem(cardSw, col1, rY1, "投屏时自动息屏", "关闭手机屏幕降低发热并保护隐私", out togScreenOff, false);
-            AddSwitchItem(cardSw, col1, rY2, "窗口置顶显示", "保持投屏窗口在所有应用程序最前端", out togAlwaysOnTop, false);
-            AddSwitchItem(cardSw, col1, rY3, "无边框模式 (隐藏原生标题栏)", "隐藏顶部标题栏；可随时在【工具】页快捷重置窗口位置", out togBorderless, false);
+            AddSwitchItem(cardSw, col1, rY1, "投屏时自动息屏", "关闭手机物理屏幕，极大降低发热并保护隐私", out togScreenOff, false);
+            AddSwitchItem(cardSw, col1, rY2, "窗口置顶显示", "保持投屏窗口始终固定于所有桌面应用最前端", out togAlwaysOnTop, false);
+            AddSwitchItem(cardSw, col1, rY3, "无边框模式", "隐藏投屏窗口原生标题栏，呈现极简纯净画面", out togBorderless, false);
 
-            AddSwitchItem(cardSw, col2, rY1, "保持手机常亮", "投屏期间阻止移动设备自动休眠锁屏", out togStayAwake, true);
-            AddSwitchItem(cardSw, col2, rY2, "音频实时转发", "将设备内部音频流低延迟同步至电脑", out togAudio, true);
-            AddSwitchItem(cardSw, col2, rY3, "绘制物理触控点", "在屏幕上可视化呈现手指滑动轨迹", out togTouches, false);
+            AddSwitchItem(cardSw, col2, rY1, "保持手机常亮", "投屏运作期间阻止移动设备自动休眠锁屏", out togStayAwake, true);
+            AddSwitchItem(cardSw, col2, rY2, "音频实时转发", "将设备内部声音极低延迟回传至电脑扬声器", out togAudio, true);
+            AddSwitchItem(cardSw, col2, rY3, "绘制物理触控点", "在投屏画面上同步呈现手指点击与滑动圆点", out togTouches, false);
 
             pnl.Controls.Add(cardSw);
 
-            // 3. 底部大按钮
+            // 3. 核心控制大按钮 (52px 高度极光质感)
             btnLaunchPrimary = new StudioButton
             {
-                Text = "启动超清投屏 (无控制台黑框模式)",
-                Location = new Point(0, 422),
-                Size = new Size(610, 60),
-                Radius = 10,
-                Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold),
+                Text = "🚀 启动超清投屏 (零 CMD 黑框极客模式)",
+                Location = new Point(0, 380),
+                Size = new Size(626, 52),
+                Radius = 8,
+                Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Bold),
                 Style = StudioButton.ButtonStyle.Accent
             };
             btnLaunchPrimary.Click += BtnLaunchPrimary_Click;
 
             btnStopPrimary = new StudioButton
             {
-                Text = "结束投屏",
-                Location = new Point(626, 422),
-                Size = new Size(250, 60),
-                Radius = 10,
-                Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Bold),
+                Text = "⏹ 终止投屏",
+                Location = new Point(640, 380),
+                Size = new Size(246, 52),
+                Radius = 8,
+                Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold),
                 Style = StudioButton.ButtonStyle.Danger,
                 Enabled = false
             };
             btnStopPrimary.Click += BtnStopPrimary_Click;
 
             pnl.Controls.AddRange(new Control[] { btnLaunchPrimary, btnStopPrimary });
+
+            // 4. 底部快捷键速查条 (Shortcuts Dock - 消除底部死角空间)
+            StudioCard cardDock = new StudioCard { Location = new Point(0, 444), Size = new Size(886, 60), BackColor = Color.FromArgb(16, 19, 25) };
+            
+            Label lblDockTag = new Label
+            {
+                Text = "⌨️ 快捷键速查 :",
+                Font = UITheme.FontItemTitle,
+                ForeColor = UITheme.Accent,
+                BackColor = Color.FromArgb(16, 19, 25),
+                Location = new Point(18, 20),
+                AutoSize = true
+            };
+            cardDock.Controls.Add(lblDockTag);
+
+            string[] shortcuts = new string[] {
+                "Alt+F 全屏切换",
+                "Alt+G 1:1原画比例",
+                "Alt+H 主页 (Home)",
+                "Alt+B 返回 (Back)",
+                "Alt+S 多任务切换",
+                "Alt+P 电源键",
+                "Alt+O 关闭手机屏幕"
+            };
+
+            int badgeX = 148;
+            foreach (string sc in shortcuts)
+            {
+                Label badge = new Label
+                {
+                    Text = sc,
+                    Font = UITheme.FontSmall,
+                    ForeColor = UITheme.TextSecondary,
+                    BackColor = Color.FromArgb(24, 28, 38),
+                    Location = new Point(badgeX, 18),
+                    Padding = new Padding(6, 4, 6, 4),
+                    AutoSize = true
+                };
+                cardDock.Controls.Add(badge);
+                badgeX += badge.PreferredWidth + 10;
+            }
+
+            pnl.Controls.Add(cardDock);
+
+            // 5. 快捷工装条 (截图 / 重启ADB / 终端)
+            StudioCard cardQuickTools = new StudioCard { Location = new Point(0, 516), Size = new Size(886, 68), BackColor = Color.FromArgb(14, 17, 23) };
+
+            Label lblToolHint = new Label
+            {
+                Text = "⚡ 快捷操作 :",
+                Font = UITheme.FontItemTitle,
+                ForeColor = UITheme.TextPrimary,
+                BackColor = Color.FromArgb(14, 17, 23),
+                Location = new Point(18, 24),
+                AutoSize = true
+            };
+
+            StudioButton btnQuickCap = new StudioButton
+            {
+                Text = "📸 快速截屏",
+                Location = new Point(126, 16),
+                Size = new Size(130, 36),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnQuickCap.Click += (s, e) => TakeDeviceScreenshot();
+
+            StudioButton btnQuickWake = new StudioButton
+            {
+                Text = "💡 唤醒屏幕",
+                Location = new Point(268, 16),
+                Size = new Size(130, 36),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnQuickWake.Click += (s, e) => SendAdbKeyEvent(224);
+
+            StudioButton btnQuickTerm = new StudioButton
+            {
+                Text = "💻 打开 ADB 终端",
+                Location = new Point(410, 16),
+                Size = new Size(150, 36),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnQuickTerm.Click += (s, e) => OpenAdbTerminal();
+
+            StudioButton btnQuickRestartAdb = new StudioButton
+            {
+                Text = "🔄 重启 ADB 服务",
+                Location = new Point(572, 16),
+                Size = new Size(150, 36),
+                Style = StudioButton.ButtonStyle.Secondary
+            };
+            btnQuickRestartAdb.Click += (s, e) => RestartAdbServer();
+
+            cardQuickTools.Controls.AddRange(new Control[] { lblToolHint, btnQuickCap, btnQuickWake, btnQuickTerm, btnQuickRestartAdb });
+            pnl.Controls.Add(cardQuickTools);
+
             return pnl;
         }
 
@@ -1087,7 +1330,7 @@ namespace ScrcpyStudio
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.CardBg,
                 Location = new Point(x, y),
-                Size = new Size(295, 20),
+                Size = new Size(320, 20),
                 AutoEllipsis = true
             };
             Label lblS = new Label
@@ -1096,54 +1339,108 @@ namespace ScrcpyStudio
                 Font = UITheme.FontItemSub,
                 ForeColor = UITheme.TextMuted,
                 BackColor = UITheme.CardBg,
-                Location = new Point(x, y + 24),
-                Size = new Size(295, 18),
+                Location = new Point(x, y + 22),
+                Size = new Size(320, 18),
                 AutoEllipsis = true
             };
             toggle = new StudioToggle
             {
-                Location = new Point(x + 330, y + 8),
+                Location = new Point(x + 350, y + 6),
                 Checked = defState
             };
             parent.Controls.AddRange(new Control[] { lblT, lblS, toggle });
         }
 
+        #endregion
+
+        #region Page 2: 画质与性能调校 Display
+
         private Panel CreatePageDisplay()
         {
-            Panel pnl = new Panel { Location = new Point(32, 82), Size = new Size(876, 595), BackColor = UITheme.WindowBg };
+            Panel pnl = new Panel { Location = new Point(32, 74), Size = new Size(886, 610), BackColor = UITheme.WindowBg };
 
-            StudioCard card = new StudioCard { Location = new Point(0, 0), Size = new Size(876, 510) };
+            // 1. 视频流与硬件加速卡片
+            StudioCard cardVideo = new StudioCard { Location = new Point(0, 0), Size = new Size(886, 280) };
+            Label lblVTitle = new Label
+            {
+                Text = "视频渲染与硬件编码 (Video & Acceleration)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardVideo.Controls.Add(lblVTitle);
 
-            int startY = 32, step = 114;
+            int startY = 48, step = 56;
 
-            comboResolution = new StudioComboBox { Location = new Point(480, startY + 8), Width = 360 };
-            comboResolution.Items.AddRange(new string[] { "跟随设备原生分辨率 (默认最高清)", "1080P (1920×1080 均衡高清)", "720P (1280×720 极速流畅)", "480P (超低带宽模式)" });
+            comboResolution = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboResolution.Items.AddRange(new string[] { "跟随设备原生分辨率 (最高清画质)", "4K (3840×2160 极限画质)", "2K (2560×1440 超清均衡)", "1080P (1920×1080 标准推荐)", "720P (1280×720 流畅极速)" });
             comboResolution.SelectedIndex = 0;
-            AddSettingRow(card, 26, startY, "最大分辨率限制 (Max Size):", "降低投屏像素可极大程度减轻低配置 PC 与 Wi-Fi 的渲染负载", comboResolution);
+            AddCompactSettingRow(cardVideo, 22, startY, "最大分辨率限制 (Max Size):", "限制长边像素可显著降低高分屏手机与 Wi-Fi 的编码吞吐压力", comboResolution);
 
             startY += step;
-            comboFps = new StudioComboBox { Location = new Point(480, startY + 8), Width = 360 };
-            comboFps.Items.AddRange(new string[] { "原生无限制 (推荐原汁原味流畅)", "120 FPS (强制限制 120)", "90 FPS (平滑高帧)", "60 FPS (标准限制)", "30 FPS (节能降耗)" });
+            comboFps = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboFps.Items.AddRange(new string[] { "原生无限制 (推荐原汁原味高刷)", "144 FPS (电竞极限刷新率)", "120 FPS (旗舰高帧率突破)", "90 FPS (平滑顺畅高帧)", "60 FPS (标准能耗平衡)", "30 FPS (超低功耗模式)" });
             comboFps.SelectedIndex = 0;
-            AddSettingRow(card, 26, startY, "显示刷新率上限 (Max FPS):", "默认不加参数跟随手机原生最高刷新率，避免硬件锁帧冲突", comboFps);
+            AddCompactSettingRow(cardVideo, 22, startY, "显示刷新率上限 (Max FPS):", "默认不锁帧跟随手机原生高刷屏，亦可强制锁定指定刷新率", comboFps);
 
             startY += step;
-            comboBitrate = new StudioComboBox { Location = new Point(480, startY + 8), Width = 360 };
-            comboBitrate.Items.AddRange(new string[] { "原生默认码率 (8 Mbps 均衡)", "16 Mbps (超清推荐)", "32 Mbps (发烧级无损细节)", "48 Mbps (极客极限原画)", "4 Mbps (低网络占用)" });
+            comboBitrate = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboBitrate.Items.AddRange(new string[] { "原生默认码率 (8 Mbps 均衡)", "16 Mbps (超清细腻推荐)", "32 Mbps (极客级发烧原画)", "64 Mbps (极限无损细节压制)", "4 Mbps (弱网超低占用)" });
             comboBitrate.SelectedIndex = 0;
-            AddSettingRow(card, 26, startY, "视频传输码率 (Video Bitrate):", "若追求原生纯净体验保持默认即可，需要更高画质可提升码率", comboBitrate);
+            AddCompactSettingRow(cardVideo, 22, startY, "视频传输码率 (Video Bitrate):", "若需更细腻动态细节可调高码率，无线投屏若有卡顿可适当回调", comboBitrate);
 
             startY += step;
-            comboCodec = new StudioComboBox { Location = new Point(480, startY + 8), Width = 360 };
-            comboCodec.Items.AddRange(new string[] { "原生默认编码器 (Auto / H.264)", "H.265 / HEVC (高画质低带宽推荐)", "AV1 (下一代开放标准)" });
+            comboCodec = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboCodec.Items.AddRange(new string[] { "自动协商选择 (Auto / 兼容最佳)", "H.265 / HEVC (高压缩比低带宽推荐)", "AV1 (下一代高画质开源标准)", "H.264 (广泛兼容基线标准)" });
             comboCodec.SelectedIndex = 0;
-            AddSettingRow(card, 26, startY, "视频硬件编码器 (Video Codec):", "默认由 scrcpy 自动选择手机最稳定、延迟最低的硬件编码器", comboCodec);
+            AddCompactSettingRow(cardVideo, 22, startY, "视频硬件编码器 (Video Codec):", "优先推荐 H.265，在同等清晰度下可节约近 40% 的无线带宽消耗", comboCodec);
 
-            pnl.Controls.Add(card);
+            pnl.Controls.Add(cardVideo);
+
+            // 2. 音频转发与高级流控卡片
+            StudioCard cardAudio = new StudioCard { Location = new Point(0, 296), Size = new Size(886, 280) };
+            Label lblATitle = new Label
+            {
+                Text = "音频保真、缓冲与录制 (Audio & Stream Control)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardAudio.Controls.Add(lblATitle);
+
+            startY = 48;
+            comboAudioCodec = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboAudioCodec.Items.AddRange(new string[] { "Opus (默认超低延迟高保真)", "AAC (广泛兼容多媒体格式)", "RAW (未压缩原始 PCM 音频流)" });
+            comboAudioCodec.SelectedIndex = 0;
+            AddCompactSettingRow(cardAudio, 22, startY, "音频编码协议 (Audio Codec):", "Android 11+ 支持原生抓取内部音频，Opus 提供极致超低听感延迟", comboAudioCodec);
+
+            startY += step;
+            comboAudioBitrate = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboAudioBitrate.Items.AddRange(new string[] { "128 kbps (标准CD音质)", "192 kbps (高品质保真音频)", "256 kbps (母带级发烧音质)", "64 kbps (语音通话极低延迟)" });
+            comboAudioBitrate.SelectedIndex = 0;
+            AddCompactSettingRow(cardAudio, 22, startY, "音频流码率 (Audio Bitrate):", "控制手机内部声音回传给电脑声卡时的传输采样压缩品质", comboAudioBitrate);
+
+            startY += step;
+            comboBuffer = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboBuffer.Items.AddRange(new string[] { "0 ms (极限零缓冲实时操控)", "25 ms (平滑微缓冲抗抖动)", "50 ms (抗丢包弱网防花屏)", "100 ms (高容错播放缓冲)" });
+            comboBuffer.SelectedIndex = 0;
+            AddCompactSettingRow(cardAudio, 22, startY, "画面显示缓冲区 (Display Buffer):", "游戏竞技建议开启 0ms；无线网络抖动导致轻微顿挫时可设为 25ms", comboBuffer);
+
+            startY += step;
+            comboRecord = new StudioComboBox { Location = new Point(500, startY), Width = 350 };
+            comboRecord.Items.AddRange(new string[] { "仅实时投屏 (不录制保存本地)", "自动录制为 MP4 (H.264/AAC 通用)", "自动录制为 MKV (断电防损坏容器)" });
+            comboRecord.SelectedIndex = 0;
+            AddCompactSettingRow(cardAudio, 22, startY, "同步录制投屏流 (Auto Record):", "开启后投屏时将自动录制音视频流并无损持久化到当前工作目录", comboRecord);
+
+            pnl.Controls.Add(cardAudio);
             return pnl;
         }
 
-        private void AddSettingRow(Control parent, int x, int y, string title, string sub, Control control)
+        private void AddCompactSettingRow(Control parent, int x, int y, string title, string sub, Control control)
         {
             Label lblT = new Label
             {
@@ -1151,7 +1448,7 @@ namespace ScrcpyStudio
                 Font = UITheme.FontItemTitle,
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.CardBg,
-                Location = new Point(x, y),
+                Location = new Point(x, y + 2),
                 AutoSize = true
             };
             Label lblS = new Label
@@ -1160,14 +1457,293 @@ namespace ScrcpyStudio
                 Font = UITheme.FontItemSub,
                 ForeColor = UITheme.TextMuted,
                 BackColor = UITheme.CardBg,
-                Location = new Point(x, y + 26),
+                Location = new Point(x, y + 22),
                 AutoSize = true
             };
 
             parent.Controls.AddRange(new Control[] { lblT, lblS, control });
         }
 
+        #endregion
 
+        #region Page 3: 实用辅助工具箱 Tools
+
+        private Panel CreatePageTools()
+        {
+            Panel pnl = new Panel { Location = new Point(32, 74), Size = new Size(886, 610), BackColor = UITheme.WindowBg };
+
+            // 1. 移动端快捷控制按键
+            StudioCard cardKeys = new StudioCard { Location = new Point(0, 0), Size = new Size(886, 260) };
+            Label lblKTitle = new Label
+            {
+                Text = "移动端虚拟按键直通 (Android Key Control)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardKeys.Controls.Add(lblKTitle);
+
+            // 第一行按键：导航键
+            StudioButton btnBack = new StudioButton { Text = "🔙 返回 (Back)", Location = new Point(22, 54), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnBack.Click += (s, e) => SendAdbKeyEvent(4);
+
+            StudioButton btnHome = new StudioButton { Text = "🏠 主页 (Home)", Location = new Point(184, 54), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnHome.Click += (s, e) => SendAdbKeyEvent(3);
+
+            StudioButton btnRecents = new StudioButton { Text = "📑 任务 (Recents)", Location = new Point(346, 54), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnRecents.Click += (s, e) => SendAdbKeyEvent(187);
+
+            StudioButton btnPower = new StudioButton { Text = "🔌 电源 (Power)", Location = new Point(508, 54), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnPower.Click += (s, e) => SendAdbKeyEvent(26);
+
+            StudioButton btnWake = new StudioButton { Text = "💡 唤醒点亮屏幕", Location = new Point(670, 54), Size = new Size(190, 42), Style = StudioButton.ButtonStyle.Accent };
+            btnWake.Click += (s, e) => SendAdbKeyEvent(224);
+
+            // 第二行按键：多媒体与屏幕
+            StudioButton btnVolUp = new StudioButton { Text = "🔊 音量增加 (+)", Location = new Point(22, 110), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnVolUp.Click += (s, e) => SendAdbKeyEvent(24);
+
+            StudioButton btnVolDown = new StudioButton { Text = "🔉 音量减小 (-)", Location = new Point(184, 110), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnVolDown.Click += (s, e) => SendAdbKeyEvent(25);
+
+            StudioButton btnMute = new StudioButton { Text = "🔇 静音切换", Location = new Point(346, 110), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnMute.Click += (s, e) => SendAdbKeyEvent(164);
+
+            StudioButton btnRotate = new StudioButton { Text = "🔄 旋转屏幕 90°", Location = new Point(508, 110), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnRotate.Click += (s, e) => RotateDeviceScreen();
+
+            StudioButton btnShot = new StudioButton { Text = "📸 高清截屏到本地", Location = new Point(670, 110), Size = new Size(190, 42), Style = StudioButton.ButtonStyle.Accent };
+            btnShot.Click += (s, e) => TakeDeviceScreenshot();
+
+            // 第三行操作：展开通知栏
+            StudioButton btnExpandNotif = new StudioButton { Text = "📥 下拉通知栏", Location = new Point(22, 166), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnExpandNotif.Click += (s, e) => RunAdbShell("cmd statusbar expand-notifications");
+
+            StudioButton btnCollapseNotif = new StudioButton { Text = "📤 收起通知栏", Location = new Point(184, 166), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnCollapseNotif.Click += (s, e) => RunAdbShell("cmd statusbar collapse");
+
+            StudioButton btnReboot = new StudioButton { Text = "⚠️ 重启设备系统", Location = new Point(346, 166), Size = new Size(150, 42), Style = StudioButton.ButtonStyle.Danger };
+            btnReboot.Click += (s, e) => RebootDevice();
+
+            StudioButton btnRebootBootloader = new StudioButton { Text = "⚡ 重启至 Bootloader", Location = new Point(508, 166), Size = new Size(190, 42), Style = StudioButton.ButtonStyle.Danger };
+            btnRebootBootloader.Click += (s, e) => RebootBootloader();
+
+            cardKeys.Controls.AddRange(new Control[] {
+                btnBack, btnHome, btnRecents, btnPower, btnWake,
+                btnVolUp, btnVolDown, btnMute, btnRotate, btnShot,
+                btnExpandNotif, btnCollapseNotif, btnReboot, btnRebootBootloader
+            });
+
+            pnl.Controls.Add(cardKeys);
+
+            // 2. 剪贴板快速同步与高级终端卡片
+            StudioCard cardClip = new StudioCard { Location = new Point(0, 276), Size = new Size(886, 300) };
+            Label lblCTitle = new Label
+            {
+                Text = "剪贴板文字推送与调试终端 (Clipboard & Diagnostics)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardClip.Controls.Add(lblCTitle);
+
+            Label lblClipSub = new Label
+            {
+                Text = "输入文字并一键直接打字推送到手机当前获得焦点的输入框（解决手机端输入复杂长密码难题）：",
+                Font = UITheme.FontItemSub,
+                ForeColor = UITheme.TextMuted,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 48),
+                AutoSize = true
+            };
+            cardClip.Controls.Add(lblClipSub);
+
+            StudioTextBox txtClip = new StudioTextBox { Location = new Point(22, 74), Size = new Size(680, 40) };
+            StudioButton btnSendText = new StudioButton { Text = "推送文字到手机", Location = new Point(712, 74), Size = new Size(150, 40), Style = StudioButton.ButtonStyle.Accent };
+            btnSendText.Click += (s, e) =>
+            {
+                string text = txtClip.Text;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    // 对文本进行基础转义后通过 adb shell input text 发送
+                    string safe = text.Replace(" ", "%s").Replace("&", "\\&").Replace("\"", "\\\"");
+                    RunAdbShell("input text \"" + safe + "\"");
+                    UpdateGlobalStatus(true, "文本已推送到设备");
+                }
+            };
+            cardClip.Controls.AddRange(new Control[] { txtClip, btnSendText });
+
+            Panel div = new Panel { Location = new Point(22, 134), Size = new Size(840, 1), BackColor = UITheme.InnerBorder };
+            cardClip.Controls.Add(div);
+
+            Label lblCmdTitle = new Label
+            {
+                Text = "开发者终端与诊断环境 :",
+                Font = UITheme.FontItemTitle,
+                ForeColor = UITheme.TextPrimary,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 150),
+                AutoSize = true
+            };
+            cardClip.Controls.Add(lblCmdTitle);
+
+            StudioButton btnTerm = new StudioButton { Text = "💻 打开独立 ADB 命令行", Location = new Point(22, 184), Size = new Size(200, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnTerm.Click += (s, e) => OpenAdbTerminal();
+
+            StudioButton btnOpenWorkDir = new StudioButton { Text = "📂 打开工作台目录", Location = new Point(234, 184), Size = new Size(180, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnOpenWorkDir.Click += (s, e) => Process.Start("explorer.exe", AppDomain.CurrentDomain.BaseDirectory);
+
+            StudioButton btnInstallApk = new StudioButton { Text = "📦 选择 APK 安装到设备", Location = new Point(426, 184), Size = new Size(200, 42), Style = StudioButton.ButtonStyle.Secondary };
+            btnInstallApk.Click += (s, e) =>
+            {
+                OpenFileDialog ofd = new OpenFileDialog { Filter = "Android 安装包 (*.apk)|*.apk" };
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    UpdateGlobalStatus(false, "正在安装 APK...");
+                    RunAdbCommand("install -r \"" + ofd.FileName + "\"", (outStr) =>
+                    {
+                        MessageBox.Show(outStr, "APK 安装反馈", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UpdateGlobalStatus(true, "APK 安装完成");
+                    });
+                }
+            };
+
+            cardClip.Controls.AddRange(new Control[] { btnTerm, btnOpenWorkDir, btnInstallApk });
+
+            pnl.Controls.Add(cardClip);
+            return pnl;
+        }
+
+        #endregion
+
+        #region Page 4: 引擎与环境配置 Settings
+
+        private Panel CreatePageSettings()
+        {
+            Panel pnl = new Panel { Location = new Point(32, 74), Size = new Size(886, 610), BackColor = UITheme.WindowBg };
+
+            // 1. 核心程序路径配置
+            StudioCard cardPath = new StudioCard { Location = new Point(0, 0), Size = new Size(886, 210) };
+            Label lblPTitle = new Label
+            {
+                Text = "投屏核心与 ADB 服务路径 (Core Engine & ADB Paths)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardPath.Controls.Add(lblPTitle);
+
+            // scrcpy.exe 路径行
+            Label lblScrcpyLabel = new Label { Text = "scrcpy.exe 核心路径 :", Font = UITheme.FontBodyBold, ForeColor = UITheme.TextPrimary, BackColor = UITheme.CardBg, Location = new Point(22, 54), AutoSize = true };
+            lblScrcpyPathVal = new Label { Text = scrcpyExePath, Font = UITheme.FontMono, ForeColor = UITheme.TextSecondary, BackColor = UITheme.CardBg, Location = new Point(190, 56), Size = new Size(430, 20), AutoEllipsis = true };
+            lblScrcpyStatus = new Label { Text = "● 检测中", Font = UITheme.FontSmall, ForeColor = UITheme.Warning, BackColor = UITheme.CardBg, Location = new Point(630, 56), AutoSize = true };
+            StudioButton btnBrowseScrcpy = new StudioButton { Text = "浏览...", Location = new Point(740, 48), Size = new Size(120, 32), Style = StudioButton.ButtonStyle.Secondary };
+            btnBrowseScrcpy.Click += (s, e) =>
+            {
+                OpenFileDialog ofd = new OpenFileDialog { Filter = "scrcpy 可执行文件 (scrcpy.exe)|scrcpy.exe" };
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    SetCorePath(ofd.FileName);
+                    AppendLog("已更新 scrcpy.exe 路径为: " + ofd.FileName);
+                }
+            };
+
+            // adb.exe 路径行
+            Label lblAdbLabel = new Label { Text = "adb.exe 调试工具路径 :", Font = UITheme.FontBodyBold, ForeColor = UITheme.TextPrimary, BackColor = UITheme.CardBg, Location = new Point(22, 102), AutoSize = true };
+            lblAdbPathVal = new Label { Text = adbExePath, Font = UITheme.FontMono, ForeColor = UITheme.TextSecondary, BackColor = UITheme.CardBg, Location = new Point(190, 104), Size = new Size(430, 20), AutoEllipsis = true };
+            lblAdbStatus = new Label { Text = "● 检测中", Font = UITheme.FontSmall, ForeColor = UITheme.Warning, BackColor = UITheme.CardBg, Location = new Point(630, 104), AutoSize = true };
+            StudioButton btnBrowseAdb = new StudioButton { Text = "浏览...", Location = new Point(740, 96), Size = new Size(120, 32), Style = StudioButton.ButtonStyle.Secondary };
+            btnBrowseAdb.Click += (s, e) =>
+            {
+                OpenFileDialog ofd = new OpenFileDialog { Filter = "ADB 可执行文件 (adb.exe)|adb.exe" };
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    adbExePath = ofd.FileName;
+                    UpdateEngineStatusDisplay();
+                    AppendLog("已手动指定 ADB 路径为: " + ofd.FileName);
+                }
+            };
+
+            StudioButton btnAutoDetect = new StudioButton { Text = "🔍 重新自动检测环境", Location = new Point(22, 150), Size = new Size(180, 38), Style = StudioButton.ButtonStyle.Secondary };
+            btnAutoDetect.Click += (s, e) =>
+            {
+                DetectScrcpyEngine();
+                RefreshDeviceList();
+                AppendLog("已完成工作台核心与调试环境重新自检");
+            };
+
+            StudioButton btnRestartAdbServer = new StudioButton { Text = "🔄 一键重启 ADB 守护进程", Location = new Point(214, 150), Size = new Size(200, 38), Style = StudioButton.ButtonStyle.Secondary };
+            btnRestartAdbServer.Click += (s, e) => RestartAdbServer();
+
+            cardPath.Controls.AddRange(new Control[] {
+                lblScrcpyLabel, lblScrcpyPathVal, lblScrcpyStatus, btnBrowseScrcpy,
+                lblAdbLabel, lblAdbPathVal, lblAdbStatus, btnBrowseAdb,
+                btnAutoDetect, btnRestartAdbServer
+            });
+
+            pnl.Controls.Add(cardPath);
+
+            // 2. 实时终端日志监视窗口
+            StudioCard cardLog = new StudioCard { Location = new Point(0, 226), Size = new Size(886, 350) };
+            Label lblLTitle = new Label
+            {
+                Text = "工作台运行与控制台实时日志 (Console & Live Logs)",
+                Font = UITheme.FontCardHeader,
+                ForeColor = UITheme.TextWhite,
+                BackColor = UITheme.CardBg,
+                Location = new Point(22, 16),
+                AutoSize = true
+            };
+            cardLog.Controls.Add(lblLTitle);
+
+            StudioButton btnClearLog = new StudioButton { Text = "清空日志", Location = new Point(760, 12), Size = new Size(100, 30), Style = StudioButton.ButtonStyle.Ghost };
+            btnClearLog.Click += (s, e) => { txtLogMonitor.Clear(); };
+            cardLog.Controls.Add(btnClearLog);
+
+            txtLogMonitor = new TextBox
+            {
+                Location = new Point(22, 52),
+                Size = new Size(842, 276),
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BackColor = Color.FromArgb(10, 12, 16),
+                ForeColor = Color.FromArgb(170, 185, 200),
+                Font = UITheme.FontMono,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            cardLog.Controls.Add(txtLogMonitor);
+
+            pnl.Controls.Add(cardLog);
+
+            UpdateEngineStatusDisplay();
+            AppendLog("Scrcpy Studio 现代化控制台已启动");
+            return pnl;
+        }
+
+        private void AppendLog(string message)
+        {
+            if (txtLogMonitor != null && !txtLogMonitor.IsDisposed)
+            {
+                if (txtLogMonitor.InvokeRequired)
+                {
+                    txtLogMonitor.BeginInvoke(new Action(() => AppendLog(message)));
+                    return;
+                }
+                string time = DateTime.Now.ToString("HH:mm:ss");
+                txtLogMonitor.AppendText(string.Format("[{0}] {1}\r\n", time, message));
+            }
+        }
+
+        #endregion
+
+        #region ADB 与设备辅助功能逻辑
 
         private void RefreshDeviceList()
         {
@@ -1175,6 +1751,7 @@ namespace ScrcpyStudio
             if (string.IsNullOrEmpty(adbExePath))
             {
                 UpdateGlobalStatus(false, "未检测到 ADB 路径");
+                AppendLog("警告: 未检测到 ADB 路径");
                 return;
             }
 
@@ -1212,6 +1789,7 @@ namespace ScrcpyStudio
                     lblDeviceBadge.Text = string.Format("● 在线设备 ({0})", comboDevices.Items.Count);
                     lblDeviceBadge.ForeColor = UITheme.Accent;
                     UpdateGlobalStatus(true, "设备在线就绪");
+                    AppendLog(string.Format("成功发现 {0} 台可用 Android 调试设备: {1}", comboDevices.Items.Count, comboDevices.SelectedItem));
                 }
                 else
                 {
@@ -1219,12 +1797,26 @@ namespace ScrcpyStudio
                     lblDeviceBadge.Text = "● 未检测到设备";
                     lblDeviceBadge.ForeColor = UITheme.Danger;
                     UpdateGlobalStatus(false, "等待设备插入");
+                    AppendLog("未检测到任何 USB/Wi-Fi 调试设备，请确保已打开手机 USB 调试");
                 }
             }
             catch (Exception ex)
             {
                 UpdateGlobalStatus(false, "ADB 异常: " + ex.Message);
+                AppendLog("ADB 异常: " + ex.Message);
             }
+        }
+
+        private void BtnAdbTcpip_Click(object sender, EventArgs e)
+        {
+            UpdateGlobalStatus(false, "开启 TCP/IP 5555 端口中...");
+            AppendLog("正在向当前设备下发 'adb tcpip 5555' 开启无线调试守护端口...");
+            RunAdbCommand("tcpip 5555", (outStr) =>
+            {
+                MessageBox.Show(outStr, "TCP/IP 5555 开启结果", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AppendLog("TCP/IP 结果: " + outStr.Trim());
+                UpdateGlobalStatus(true, "TCP/IP 端口已开放");
+            });
         }
 
         private void BtnWirelessConnect_Click(object sender, EventArgs e)
@@ -1233,7 +1825,8 @@ namespace ScrcpyStudio
             if (string.IsNullOrEmpty(ip)) return;
             if (!ip.Contains(":")) ip += ":5555";
 
-            UpdateGlobalStatus(false, "配对中...");
+            UpdateGlobalStatus(false, "无线配对中...");
+            AppendLog("正在尝试无线配对连接至: " + ip);
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo(adbExePath, "connect " + ip)
@@ -1249,6 +1842,7 @@ namespace ScrcpyStudio
                 {
                     string outStr = p.StandardOutput.ReadToEnd();
                     p.WaitForExit();
+                    AppendLog("配对反馈: " + outStr.Trim());
                     MessageBox.Show(outStr, "无线配对结果", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     RefreshDeviceList();
                 }
@@ -1256,16 +1850,151 @@ namespace ScrcpyStudio
             catch (Exception ex)
             {
                 MessageBox.Show("连接失败: " + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendLog("连接失败: " + ex.Message);
             }
         }
 
+        private void SendAdbKeyEvent(int keyCode)
+        {
+            RunAdbShell("input keyevent " + keyCode);
+            AppendLog("已向设备发送模拟物理按键 KeyCode: " + keyCode);
+        }
 
+        private void RotateDeviceScreen()
+        {
+            RunAdbShell("settings put system user_rotation 1");
+            AppendLog("已请求设备旋转屏幕方向");
+        }
+
+        private void RebootDevice()
+        {
+            if (MessageBox.Show("确定要重启连接的 Android 手机吗？", "确认重启", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                RunAdbCommand("reboot", (outStr) => { AppendLog("已向设备发送系统重启指令"); });
+            }
+        }
+
+        private void RebootBootloader()
+        {
+            if (MessageBox.Show("确定要将手机重启至 Bootloader (Fastboot) 模式吗？", "确认重启", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                RunAdbCommand("reboot bootloader", (outStr) => { AppendLog("已向设备发送重启至 Bootloader 指令"); });
+            }
+        }
+
+        private void TakeDeviceScreenshot()
+        {
+            try
+            {
+                string devArg = (comboDevices.SelectedItem != null) ? string.Format("-s {0} ", comboDevices.SelectedItem) : "";
+                string fileName = string.Format("screenshot_{0}.png", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                string savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+
+                UpdateGlobalStatus(false, "正在抓取设备屏幕截图...");
+                AppendLog("正在抓取屏幕截图并保存至: " + savePath);
+
+                // 先在手机端截图，再拉取到本地
+                RunAdbCommand(devArg + "shell screencap -p /sdcard/scrcpy_screen.png", (s1) =>
+                {
+                    RunAdbCommand(devArg + string.Format("pull /sdcard/scrcpy_screen.png \"{0}\"", savePath), (s2) =>
+                    {
+                        RunAdbShell(devArg + "rm /sdcard/scrcpy_screen.png");
+                        if (File.Exists(savePath))
+                        {
+                            UpdateGlobalStatus(true, "截图已保存");
+                            AppendLog("截图保存成功: " + fileName);
+                            if (MessageBox.Show("截图已保存至:\n" + savePath + "\n\n是否立即打开查看？", "截图成功", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                            {
+                                Process.Start(savePath);
+                            }
+                        }
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("截图失败: " + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendLog("截图失败: " + ex.Message);
+            }
+        }
+
+        private void OpenAdbTerminal()
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe")
+                {
+                    WorkingDirectory = File.Exists(scrcpyExePath) ? Path.GetDirectoryName(scrcpyExePath) : AppDomain.CurrentDomain.BaseDirectory
+                };
+                Process.Start(psi);
+                AppendLog("已打开 ADB 独立命令行交互控制台");
+            }
+            catch { }
+        }
+
+        private void RestartAdbServer()
+        {
+            UpdateGlobalStatus(false, "正在重启 ADB 服务...");
+            AppendLog("正在执行 'adb kill-server' 并重启守护进程...");
+            RunAdbCommand("kill-server", (s1) =>
+            {
+                RunAdbCommand("start-server", (s2) =>
+                {
+                    RefreshDeviceList();
+                    UpdateGlobalStatus(true, "ADB 服务已成功重启");
+                    AppendLog("ADB 服务已成功重启");
+                });
+            });
+        }
+
+        private void RunAdbShell(string shellCommand)
+        {
+            string devArg = (comboDevices.SelectedItem != null) ? string.Format("-s {0} ", comboDevices.SelectedItem) : "";
+            RunAdbCommand(devArg + "shell " + shellCommand, null);
+        }
+
+        private void RunAdbCommand(string arguments, Action<string> onComplete)
+        {
+            if (string.IsNullOrEmpty(adbExePath)) return;
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo(adbExePath, arguments)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                if (File.Exists(scrcpyExePath))
+                    psi.WorkingDirectory = Path.GetDirectoryName(scrcpyExePath);
+
+                Process p = Process.Start(psi);
+                p.EnableRaisingEvents = true;
+                p.Exited += (s, e) =>
+                {
+                    string outStr = p.StandardOutput.ReadToEnd();
+                    if (onComplete != null)
+                    {
+                        this.BeginInvoke(new Action(() => onComplete(outStr)));
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                AppendLog("执行 ADB 命令异常: " + ex.Message);
+            }
+        }
+
+        #endregion
+
+        #region 启动核心引擎与进程管理
 
         private void BtnLaunchPrimary_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(scrcpyExePath) || !File.Exists(scrcpyExePath))
             {
-                MessageBox.Show("未找到核心程序 scrcpy.exe，请在【引擎与环境】指定路径！", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("未找到核心程序 scrcpy.exe，请在【引擎与设置】中指定有效路径！", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SelectNavTab(3);
                 return;
             }
 
@@ -1280,23 +2009,56 @@ namespace ScrcpyStudio
             if (comboDevices.SelectedItem != null)
                 args += string.Format("-s {0} ", comboDevices.SelectedItem);
 
-            if (comboResolution.SelectedIndex == 1) args += "--max-size 1080 ";
-            else if (comboResolution.SelectedIndex == 2) args += "--max-size 720 ";
-            else if (comboResolution.SelectedIndex == 3) args += "--max-size 480 ";
+            // 分辨率
+            if (comboResolution.SelectedIndex == 1) args += "--max-size 3840 ";
+            else if (comboResolution.SelectedIndex == 2) args += "--max-size 2560 ";
+            else if (comboResolution.SelectedIndex == 3) args += "--max-size 1080 ";
+            else if (comboResolution.SelectedIndex == 4) args += "--max-size 720 ";
 
-            if (comboFps.SelectedIndex == 1) args += "--max-fps 120 ";
-            else if (comboFps.SelectedIndex == 2) args += "--max-fps 90 ";
-            else if (comboFps.SelectedIndex == 3) args += "--max-fps 60 ";
-            else if (comboFps.SelectedIndex == 4) args += "--max-fps 30 ";
+            // 刷新率
+            if (comboFps.SelectedIndex == 1) args += "--max-fps 144 ";
+            else if (comboFps.SelectedIndex == 2) args += "--max-fps 120 ";
+            else if (comboFps.SelectedIndex == 3) args += "--max-fps 90 ";
+            else if (comboFps.SelectedIndex == 4) args += "--max-fps 60 ";
+            else if (comboFps.SelectedIndex == 5) args += "--max-fps 30 ";
 
+            // 视频码率
             if (comboBitrate.SelectedIndex == 1) args += "--video-bit-rate 16M ";
             else if (comboBitrate.SelectedIndex == 2) args += "--video-bit-rate 32M ";
-            else if (comboBitrate.SelectedIndex == 3) args += "--video-bit-rate 48M ";
+            else if (comboBitrate.SelectedIndex == 3) args += "--video-bit-rate 64M ";
             else if (comboBitrate.SelectedIndex == 4) args += "--video-bit-rate 4M ";
 
+            // 视频编码器
             if (comboCodec.SelectedIndex == 1) args += "--video-codec=h265 ";
             else if (comboCodec.SelectedIndex == 2) args += "--video-codec=av1 ";
+            else if (comboCodec.SelectedIndex == 3) args += "--video-codec=h264 ";
 
+            // 音频编码器与码率
+            if (comboAudioCodec.SelectedIndex == 1) args += "--audio-codec=aac ";
+            else if (comboAudioCodec.SelectedIndex == 2) args += "--audio-codec=raw ";
+
+            if (comboAudioBitrate.SelectedIndex == 1) args += "--audio-bit-rate=192K ";
+            else if (comboAudioBitrate.SelectedIndex == 2) args += "--audio-bit-rate=256K ";
+            else if (comboAudioBitrate.SelectedIndex == 3) args += "--audio-bit-rate=64K ";
+
+            // 缓冲区
+            if (comboBuffer.SelectedIndex == 1) args += "--video-buffer=25 ";
+            else if (comboBuffer.SelectedIndex == 2) args += "--video-buffer=50 ";
+            else if (comboBuffer.SelectedIndex == 3) args += "--video-buffer=100 ";
+
+            // 自动录制
+            if (comboRecord.SelectedIndex == 1)
+            {
+                string recName = string.Format("record_{0}.mp4", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                args += string.Format("--record=\"{0}\" ", recName);
+            }
+            else if (comboRecord.SelectedIndex == 2)
+            {
+                string recName = string.Format("record_{0}.mkv", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                args += string.Format("--record=\"{0}\" ", recName);
+            }
+
+            // 开关特性
             if (togScreenOff.Checked) args += "--turn-screen-off ";
             if (togAlwaysOnTop.Checked) args += "--always-on-top ";
             if (togStayAwake.Checked) args += "--stay-awake ";
@@ -1315,7 +2077,11 @@ namespace ScrcpyStudio
                     RedirectStandardError = true
                 };
 
+                AppendLog("正在以静默无黑框模式启动投屏: scrcpy " + args.Trim());
+
                 scrcpyProcess = Process.Start(psi);
+                scrcpyProcess.OutputDataReceived += (s, ev) => { if (!string.IsNullOrEmpty(ev.Data)) AppendLog("[scrcpy] " + ev.Data); };
+                scrcpyProcess.ErrorDataReceived += (s, ev) => { if (!string.IsNullOrEmpty(ev.Data)) AppendLog("[scrcpy err] " + ev.Data); };
                 scrcpyProcess.BeginOutputReadLine();
                 scrcpyProcess.BeginErrorReadLine();
                 scrcpyProcess.EnableRaisingEvents = true;
@@ -1327,17 +2093,19 @@ namespace ScrcpyStudio
                         btnLaunchPrimary.Enabled = true;
                         btnStopPrimary.Enabled = false;
                         UpdateGlobalStatus(true, "工作台就绪");
+                        AppendLog("投屏进程已正常退出");
                         scrcpyProcess = null;
                     }));
                 };
 
                 btnLaunchPrimary.Enabled = false;
                 btnStopPrimary.Enabled = true;
-                UpdateGlobalStatus(true, "投屏渲染中 (无黑框)");
+                UpdateGlobalStatus(true, "投屏渲染中 (零黑框)");
             }
             catch (Exception ex)
             {
                 MessageBox.Show("启动失败: " + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendLog("启动失败: " + ex.Message);
                 UpdateGlobalStatus(false, "启动失败");
             }
         }
@@ -1350,6 +2118,7 @@ namespace ScrcpyStudio
                 {
                     scrcpyProcess.Kill();
                     UpdateGlobalStatus(true, "已终止投屏");
+                    AppendLog("用户手动终止了投屏进程");
                 }
                 catch { }
             }
@@ -1357,10 +2126,18 @@ namespace ScrcpyStudio
 
         private void UpdateGlobalStatus(bool ok, string text)
         {
-            lblStatusDot.ForeColor = ok ? UITheme.Success : UITheme.Danger;
+            if (lblGlobalStatus == null) return;
             lblGlobalStatus.Text = text;
+            lblStatusDot.ForeColor = ok ? UITheme.Success : UITheme.Danger;
         }
 
+        #endregion
+    }
+
+    #endregion
+
+    static class Program
+    {
         [STAThread]
         static void Main()
         {
@@ -1369,5 +2146,4 @@ namespace ScrcpyStudio
             Application.Run(new MainForm());
         }
     }
-    #endregion
 }

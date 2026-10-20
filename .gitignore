@@ -8,9 +8,9 @@ build/
 /x/
 local.properties
 /scrcpy-server
+
+# Scrcpy Studio
 *.exe
 *.obj
 *.pdb
 *.cfg
-!/scrcpy-gui/
-

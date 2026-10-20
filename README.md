@@ -9,6 +9,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/angusdevgo/scrcpy-studio?style=for-the-badge&color=00E1AA)](https://github.com/angusdevgo/scrcpy-studio/stargazers)
 [![GitHub license](https://img.shields.io/github/license/angusdevgo/scrcpy-studio?style=for-the-badge&color=7928CA)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge&logo=windows)](https://github.com/angusdevgo/scrcpy-studio)
+[![Upstream](https://img.shields.io/badge/Upstream%20scrcpy-v5.0.1-00E1AA?style=for-the-badge&logo=android)](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)
 
 [功能特性](#-功能特性) • [快速上手](#-快速上手) • [二改亮点](#-二改核心亮点) • [编译构建](#-编译构建) • [快捷键指南](#-投屏快捷键指南)
 
@@ -21,6 +22,22 @@
 **Scrcpy Studio** 是对知名开源 Android 投屏神器 [scrcpy](https://github.com/Genymobile/scrcpy) 进行深度定制与体验升级的二次开发版本。
 
 官方版本的 scrcpy 虽然性能强悍，但缺乏直观便捷的参数调控界面，且在 Windows 下直接双击运行时总会弹出一个显眼的 CMD 控制台黑框。**Scrcpy Studio** 在保留官方极致性能与零延迟特性的基础上，移除了黑框干扰，并新增了专用的 **Studio 现代化控制面板**，让高刷画质调节、多设备管理、无线连接与常用开关变得触手可及。
+
+> 🔄 **上游同步状态**：底层源码已对齐官方 **scrcpy v5.0.1**（2025 最新稳定版），完整继承 D3D11VA 硬件解码、多线程解码器、FFmpeg 9.0.2 / SDL 3.4.18 / platform-tools 37.0.1 等上游全部改进。
+
+---
+
+## 🔄 上游同步记录
+
+### v4.1 → v5.0.1（本次同步）
+| 模块 | 上游关键改进 |
+|:---|:---|
+| **视频解码** | 新增 **D3D11VA 硬件解码**（Windows）、VA-API（Linux）、VideoToolbox（macOS）；解码器独立线程化，软解自动回退 |
+| **新增参数** | `--hwdec`（硬件解码模式）、`--video-buffer`、`--keep-active`、`--no-window-aspect-ratio-lock`、`--render-fit`、`--background-color` |
+| **依赖升级** | FFmpeg **9.0.2**、SDL **3.4.18**、dav1d **1.5.4**、platform-tools **37.0.1** |
+| **稳定性** | 修复 Windows H.265 硬解、AV1 硬解会话重置、YUVJ420P 帧兼容、视频调节器背压控制 |
+
+> 自定义改动（GUI 工作台、控制台隐藏补丁、Studio 文档）已全量重放到新版本基线之上，`git diff v5.0.1` 仅保留本项目自有增量。
 
 ---
 
@@ -35,6 +52,7 @@
 - **高刷突破**：支持原生 **120 FPS / 90 FPS / 60 FPS** 帧率自由切换。
 - **超清渲染**：支持指定渲染分辨率上限（4K / 2K / 1080P）或点对点原始输出。
 - **现代编解码**：支持自由选择 **H.264 / H.265 (HEVC) / AV1** 硬件加速编解码器。
+- **硬件解码加速**：v5.0.1 起底层支持 **D3D11VA** GPU 硬解，大幅降低 4K 高码率投屏时的 CPU 占用。
 - **码率自适应**：轻松设定传输码率（最高支持 64 Mbps 极高码率无损压制）。
 
 ### ⚡ 常用快捷功能一键开启

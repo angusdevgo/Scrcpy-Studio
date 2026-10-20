@@ -82,7 +82,7 @@
 ### 方式一：直接运行成品
 1. 将编译好的 `ScrcpyGUI.exe` 放入官方 scrcpy 运行目录（与 `scrcpy.exe`、`adb.exe` 同级）；
 2. 手机开启 **开发者选项** 与 **USB 调试** 并连接电脑；
-3. 双击打开 `ScrcpyGUI.exe`，点击 **「🚀 立即启动投屏」** 即可。
+3. 双击打开 `ScrcpyGUI.exe`，点击 **「🚀 启动超清投屏」** 即可。
 
 ### 方式二：从源码编译 GUI
 
@@ -100,6 +100,33 @@ cd scrcpy-studio/scrcpy-gui
 build_gui.bat
 ```
 编译完成后，会在当前目录下生成独立的 `ScrcpyGUI.exe`。
+
+### 方式三：从源码编译 scrcpy.exe（含控制台隐藏补丁）
+
+#### 环境要求
+- Windows 10 / 11 x64
+- [MSYS2](https://www.msys2.org/)（UCRT64 环境）
+
+#### 编译步骤
+在 MSYS2 **UCRT64** 终端中执行：
+```bash
+# 1. 安装工具链与依赖（SDL3 / FFmpeg / libusb 版本与官方发布版一致）
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-meson \
+                 mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf \
+                 mingw-w64-ucrt-x86_64-sdl3 mingw-w64-ucrt-x86_64-ffmpeg \
+                 mingw-w64-ucrt-x86_64-libusb
+
+# 2. 配置并编译（仅客户端，portable 模式）
+cd /c/path/to/scrcpy-studio
+meson setup build-win64 --buildtype=release --strip -Db_lto=true \
+      -Dcompile_server=false -Dportable=true
+meson compile -C build-win64
+```
+产物位于 `build-win64/app/scrcpy.exe`。
+
+> 注：`scrcpy-server` 需使用与客户端同版本的官方文件（本仓库便携包已内置 v5.0.1），
+> 服务端需 JDK + Android SDK 才能从源码构建，日常二改无需重新编译。
+> 构建验证：`objdump -p build-win64/app/scrcpy.exe | grep -i GetConsoleWindow` 应能查到导入符号。
 
 ---
 

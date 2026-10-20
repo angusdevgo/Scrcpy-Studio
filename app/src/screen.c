@@ -24,6 +24,94 @@ get_navbar_height(struct sc_screen *screen) {
     return (uint32_t) sc_navbar_get_height(screen->window);
 }
 
+// Shrink the window if it would not fit within the display usable bounds,
+// keeping the video aspect ratio and the navigation bar height
+static void
+clamp_window_to_display(struct sc_screen *screen, struct sc_size *size) {
+    SDL_DisplayID display = SDL_GetDisplayForWindow(screen->window);
+    if (!display) {
+        return;
+    }
+
+    SDL_Rect usable;
+    if (!SDL_GetDisplayUsableBounds(display, &usable)) {
+        return;
+    }
+
+    int top, left, bottom, right;
+    if (!SDL_GetWindowBordersSize(screen->window, &top, &left, &bottom,
+                                  &right)) {
+        top = left = bottom = right = 0;
+    }
+    if (top == 0 && bottom == 0) {
+        // The window is not shown yet: assume a title bar to stay safe
+        float scale = SDL_GetWindowDisplayScale(screen->window);
+        if (scale <= 0) {
+            scale = 1;
+        }
+        bottom = (int) (40 * scale);
+    }
+
+    uint32_t max_w = usable.w > left + right
+                   ? (uint32_t) (usable.w - left - right)
+                   : (uint32_t) usable.w;
+    uint32_t max_h = usable.h > top + bottom
+                   ? (uint32_t) (usable.h - top - bottom)
+                   : (uint32_t) usable.h;
+
+    if (size->width <= max_w && size->height <= max_h) {
+        return;
+    }
+
+    uint32_t navbar = get_navbar_height(screen);
+    uint32_t video_h = size->height > navbar ? size->height - navbar
+                                             : size->height;
+
+    float scale = 1.f;
+    if (video_h && max_h > navbar) {
+        scale = (float) (max_h - navbar) / video_h;
+    }
+    if (size->width && max_w) {
+        float sw = (float) max_w / size->width;
+        if (sw < scale) {
+            scale = sw;
+        }
+    }
+
+    size->width = (uint32_t) (size->width * scale);
+    size->height = (uint32_t) (video_h * scale) + navbar;
+}
+
+// Center the window (including its decorations) within the display usable area
+static void
+center_window_in_usable(struct sc_screen *screen, struct sc_size size) {
+    SDL_DisplayID display = SDL_GetDisplayForWindow(screen->window);
+    if (!display) {
+        return;
+    }
+
+    SDL_Rect usable;
+    if (!SDL_GetDisplayUsableBounds(display, &usable)) {
+        return;
+    }
+
+    int top, left, bottom, right;
+    if (!SDL_GetWindowBordersSize(screen->window, &top, &left, &bottom,
+                                  &right)) {
+        top = left = bottom = right = 0;
+    }
+
+    int outer_w = (int) size.width + left + right;
+    int outer_h = (int) size.height + top + bottom;
+
+    // SDL positions the client area: offset by the window borders
+    struct sc_point position = {
+        .x = usable.x + (usable.w - outer_w) / 2 + left,
+        .y = usable.y + (usable.h - outer_h) / 2 + top,
+    };
+    sc_sdl_set_window_position(screen->window, position);
+}
+
 static void
 set_aspect_ratio(struct sc_screen *screen, struct sc_size content_size) {
     assert(content_size.width && content_size.height);
@@ -818,11 +906,23 @@ sc_screen_show_initial_window(struct sc_screen *screen) {
     // Reserve a strip at the bottom for the navigation bar, so that the video
     // keeps its exact size (no black bars on the sides)
     window_size.height += get_navbar_height(screen);
+    clamp_window_to_display(screen, &window_size);
 
     assert(is_windowed(screen));
-    set_aspect_ratio(screen, screen->content_size);
+    if (screen->window_aspect_ratio_lock) {
+        float ar = (float) window_size.width / window_size.height;
+        if (!SDL_SetWindowAspectRatio(screen->window, ar, ar)) {
+            LOGW("Could not set window aspect ratio: %s", SDL_GetError());
+        }
+    }
     sc_sdl_set_window_size(screen->window, window_size);
-    sc_sdl_set_window_position(screen->window, position);
+
+    if (screen->req.x == SC_WINDOW_POSITION_UNDEFINED
+            && screen->req.y == SC_WINDOW_POSITION_UNDEFINED) {
+        center_window_in_usable(screen, window_size);
+    } else {
+        sc_sdl_set_window_position(screen->window, position);
+    }
 
     if (screen->req.fullscreen) {
         sc_screen_toggle_fullscreen(screen);
@@ -834,6 +934,7 @@ sc_screen_show_initial_window(struct sc_screen *screen) {
 
     screen->window_shown = true;
     sc_sdl_show_window(screen->window);
+
     sc_screen_update_content_rect(screen);
 }
 
@@ -922,8 +1023,14 @@ resize_for_content(struct sc_screen *screen, struct sc_size old_content_size,
     }
     target_size = get_optimal_size(target_size, new_content_size, true);
     target_size.height += navbar_height;
+    clamp_window_to_display(screen, &target_size);
     assert(is_windowed(screen));
-    set_aspect_ratio(screen, new_content_size);
+    if (screen->window_aspect_ratio_lock) {
+        float ar = (float) target_size.width / target_size.height;
+        if (!SDL_SetWindowAspectRatio(screen->window, ar, ar)) {
+            LOGW("Could not set window aspect ratio: %s", SDL_GetError());
+        }
+    }
     sc_sdl_set_window_size(screen->window, target_size);
 }
 

@@ -7,7 +7,7 @@
 #include "android/keycodes.h"
 
 #define BTN_COUNT 6
-#define BTN_WIDTH 56.f
+#define BTN_WIDTH 50.f
 
 #define ICON_STROKE 2.6f
 #define MAX_FAN_POINTS 64
@@ -417,10 +417,10 @@ sc_navbar_render(struct sc_navbar *nb, SDL_Renderer *renderer,
         bool pressed = (i == nb->pressed);
         if (hovered || pressed) {
             SDL_FRect pill = {
-                rect.x + 6,
-                rect.y + 8,
-                rect.w - 12,
-                rect.h - 16,
+                rect.x + 5,
+                rect.y + 5,
+                rect.w - 10,
+                rect.h - 10,
             };
             fill_round_rect(renderer, pill, 12.f,
                             pressed ? pill_pressed : pill_active);

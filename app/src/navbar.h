@@ -9,7 +9,7 @@
 #include <SDL3/SDL_video.h>
 
 // Height of the navigation bar, in window points
-#define SC_NAVBAR_HEIGHT 56
+#define SC_NAVBAR_HEIGHT 40
 
 struct sc_navbar {
     int hover;   // index of the hovered button, or -1

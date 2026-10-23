@@ -132,6 +132,7 @@ struct sc_screen_params {
     uint8_t shortcut_mods; // OR of enum sc_shortcut_mod values
 
     const char *window_title;
+    uint64_t embed_hwnd; // 0 = disabled, otherwise embed into this HWND
     bool always_on_top;
 
     int16_t window_x; // accepts SC_WINDOW_POSITION_UNDEFINED

@@ -21,6 +21,7 @@
 
 enum {
     OPT_WINDOW_TITLE = 1000,
+    OPT_EMBED_HWND,
     OPT_PUSH_TARGET,
     OPT_ALWAYS_ON_TOP,
     OPT_CROP,
@@ -1042,6 +1043,14 @@ static const struct sc_option options[] = {
         .longopt = "window-title",
         .argdesc = "text",
         .text = "Set a custom window title.",
+    },
+    {
+        .longopt_id = OPT_EMBED_HWND,
+        .longopt = "embed-hwnd",
+        .argdesc = "handle",
+        .text = "Embed the video window as a child of the given Win32 HWND "
+                "(hex or decimal). Used by Scrcpy Studio to fuse the mirror "
+                "into its own UI.",
     },
     {
         .longopt_id = OPT_WINDOW_X,
@@ -2688,6 +2697,16 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_WINDOW_TITLE:
                 opts->window_title = optarg;
                 break;
+            case OPT_EMBED_HWND: {
+                char *end = NULL;
+                unsigned long long v = strtoull(optarg, &end, 0);
+                if (!end || *end != ' ' || v == 0) {
+                    LOGE("Invalid --embed-hwnd value: %s", optarg);
+                    return false;
+                }
+                opts->embed_hwnd = (uint64_t) v;
+                break;
+            }
             case OPT_WINDOW_X:
                 if (!parse_window_position(optarg, &opts->window_x)) {
                     return false;

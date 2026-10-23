@@ -724,6 +724,12 @@ sc_screen_init(struct sc_screen *screen,
         goto error_destroy_fps_counter;
     }
 
+    // Scrcpy Studio: embed the window into an external HWND (must happen
+    // BEFORE the renderer is created so the swapchain targets a child window)
+    if (params->embed_hwnd) {
+        sc_sdl_embed_window(screen->window, params->embed_hwnd);
+    }
+
     screen->renderer = SDL_CreateRenderer(screen->window, NULL);
     if (!screen->renderer) {
         LOGE("Could not create renderer: %s", SDL_GetError());

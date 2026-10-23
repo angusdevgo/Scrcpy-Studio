@@ -7,6 +7,7 @@ const struct scrcpy_options scrcpy_options_default = {
     .crop = NULL,
     .record_filename = NULL,
     .window_title = NULL,
+    .embed_hwnd = 0,
     .push_target = NULL,
     .render_driver = NULL,
     .video_codec_options = NULL,

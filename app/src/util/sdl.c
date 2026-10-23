@@ -3,6 +3,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
+
 #include "util/log.h"
 
 SDL_Window *
@@ -89,6 +93,56 @@ sc_sdl_set_window_position(SDL_Window *window, struct sc_point point) {
     if (!ok) {
         LOGD("Could not set window position: %s", SDL_GetError());
     }
+}
+
+bool
+sc_sdl_embed_window(SDL_Window *window, uint64_t parent_hwnd) {
+#ifdef _WIN32
+    if (!parent_hwnd) {
+        return false;
+    }
+
+    SDL_PropertiesID props = SDL_GetWindowProperties(window);
+    if (!props) {
+        LOGE("Could not get window properties: %s", SDL_GetError());
+        return false;
+    }
+
+    HWND child = (HWND) SDL_GetPointerProperty(
+        props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    if (!child) {
+        LOGE("Could not get the Win32 HWND of the SDL window");
+        return false;
+    }
+
+    HWND parent = (HWND) (uintptr_t) parent_hwnd;
+
+    LONG style = GetWindowLongW(child, GWL_STYLE);
+    style &= ~(WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU
+             | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_OVERLAPPED);
+    style |= WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+    SetWindowLongW(child, GWL_STYLE, style);
+
+    LONG exstyle = GetWindowLongW(child, GWL_EXSTYLE);
+    exstyle &= ~(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_DLGMODALFRAME);
+    SetWindowLongW(child, GWL_EXSTYLE, exstyle);
+
+    SetParent(child, parent);
+
+    RECT rc;
+    GetClientRect(parent, &rc);
+    SetWindowPos(child, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
+                 SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW
+               | SWP_NOACTIVATE);
+
+    LOGI("Embedded the video window into HWND %p", (void *) parent);
+    return true;
+#else
+    (void) window;
+    (void) parent_hwnd;
+    LOGW("--embed-hwnd is only supported on Windows");
+    return false;
+#endif
 }
 
 void

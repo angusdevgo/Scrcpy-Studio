@@ -827,6 +827,7 @@ aoa_complete:
             .clipboard_autosync = options->clipboard_autosync,
             .shortcut_mods = options->shortcut_mods,
             .window_title = window_title,
+            .embed_hwnd = options->embed_hwnd,
             .always_on_top = options->always_on_top,
             .window_x = options->window_x,
             .window_y = options->window_y,

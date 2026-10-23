@@ -25,6 +25,17 @@ sc_sdl_get_window_position(SDL_Window *window);
 void
 sc_sdl_set_window_position(SDL_Window *window, struct sc_point point);
 
+/**
+ * Embed the SDL window as a child of the given Win32 HWND.
+ *
+ * Must be called BEFORE the renderer is created, so that the underlying
+ * swapchain is created for a child window (which DXGI supports).
+ *
+ * Return true on success (no-op and false on non-Windows platforms).
+ */
+bool
+sc_sdl_embed_window(SDL_Window *window, uint64_t parent_hwnd);
+
 void
 sc_sdl_show_window(SDL_Window *window);
 

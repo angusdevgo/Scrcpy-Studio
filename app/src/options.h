@@ -267,6 +267,7 @@ struct scrcpy_options {
     const char *crop;
     const char *record_filename;
     const char *window_title;
+    uint64_t embed_hwnd; // 0 = disabled, otherwise parent HWND to embed into
     const char *push_target;
     const char *render_driver;
     const char *video_codec_options;

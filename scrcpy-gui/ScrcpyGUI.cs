@@ -1054,11 +1054,11 @@ namespace ScrcpyStudio
 
         /// <summary>
         /// 把所有运行时依赖（scrcpy.exe / adb.exe / DLL / scrcpy-server）编译进本 exe，
-        /// 首次运行时释放到 %LOCALAPPDATA%\ScrcpyStudio\core，做到"一个 exe 就能跑"。
+        /// 首次运行时释放到 %LOCALAPPDATA%\Scrcpy\core，做到"一个 exe 就能跑"。
         /// </summary>
         private static class CoreBundle
         {
-            private const string BundleId = "ScrcpyStudio.Core.v5.0.1.r2";
+            private const string BundleId = "Scrcpy.Core.v5.0.1.r3";
             private const string MarkerFile = ".bundle";
 
             private static string _root;
@@ -1066,7 +1066,7 @@ namespace ScrcpyStudio
             /// <summary>
             /// 引擎释放目录：
             ///   1. 优先 &lt;exe 所在目录&gt;\core —— 安装到哪个盘就全在哪个盘，整个目录可整体拷走
-            ///   2. 该目录不可写（如 Program Files 无权限）时，退回 %LOCALAPPDATA%\ScrcpyStudio\core
+            ///   2. 该目录不可写（如 Program Files 无权限）时，退回 %LOCALAPPDATA%\Scrcpy\core
             /// </summary>
             public static string BundleRoot
             {
@@ -1084,7 +1084,7 @@ namespace ScrcpyStudio
 
                     _root = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "ScrcpyStudio", "core");
+                        "Scrcpy", "core");
                     return _root;
                 }
             }
@@ -1223,8 +1223,8 @@ namespace ScrcpyStudio
                 candidates.Add(Path.Combine(d, "core", "scrcpy.exe"));
                 candidates.Add(Path.Combine(d, "scrcpy.exe"));
                 candidates.Add(Path.Combine(d, "build-win64", "app", "scrcpy.exe"));
-                candidates.Add(Path.Combine(d, "成品", "ScrcpyStudio", "core", "scrcpy.exe"));
-                candidates.Add(Path.Combine(d, "..", "成品", "ScrcpyStudio", "core", "scrcpy.exe"));
+                candidates.Add(Path.Combine(d, "成品", "core", "scrcpy.exe"));
+                candidates.Add(Path.Combine(d, "..", "成品", "core", "scrcpy.exe"));
                 dir = dir.Parent;
             }
 
@@ -1233,11 +1233,22 @@ namespace ScrcpyStudio
             candidates.Add(@"C:\Data\Scrcpy\scrcpy.exe");
             candidates.Add(@"C:\scrcpy\scrcpy.exe");
 
+            // 自身 exe 路径：GUI 与引擎同名时，绝不能被当成引擎（防自启动递归）
+            string selfExe = "";
+            try { selfExe = Path.GetFullPath(Application.ExecutablePath); }
+            catch { }
+
             foreach (string p in candidates)
             {
                 try
                 {
-                    if (File.Exists(p)) { SetCorePath(Path.GetFullPath(p)); return; }
+                    if (!File.Exists(p)) continue;
+                    string full = Path.GetFullPath(p);
+                    if (!string.IsNullOrEmpty(selfExe)
+                        && string.Equals(full, selfExe, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    SetCorePath(full);
+                    return;
                 }
                 catch { }
             }
@@ -1345,7 +1356,7 @@ namespace ScrcpyStudio
 
             lblTitleText = new Label
             {
-                Text = "Scrcpy Studio",
+                Text = "Scrcpy",
                 Font = UITheme.FontBrand,
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.WindowBg,
@@ -2348,7 +2359,7 @@ namespace ScrcpyStudio
             pnl.Controls.Add(cardLog);
 
             UpdateEngineStatusDisplay();
-            AppendLog("Scrcpy Studio Satelite 现代化控制台已启动");
+            AppendLog("Scrcpy 现代化控制台已启动");
             return pnl;
         }
 
@@ -2956,7 +2967,7 @@ namespace ScrcpyStudio
             BackColor = UITheme.CardBg;
             DoubleBuffered = true;
             Size = new Size(UITheme.Dpi(380), UITheme.Dpi(54));
-            Text = "Scrcpy Studio 悬浮导航栏";
+            Text = "Scrcpy 悬浮导航栏";
 
             _tip = new ToolTip();
             BuildBar();

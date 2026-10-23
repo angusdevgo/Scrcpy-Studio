@@ -1,13 +1,13 @@
 ﻿; ============================================================================
-;  Scrcpy Studio 安装包构建脚本 (Inno Setup 7)
-;  用法: "D:\Inno Setup 7\ISCC.exe" 源码\installer\ScrcpyStudio.iss
+;  Scrcpy 安装包构建脚本 (Inno Setup 7)
+;  用法: "D:\Tool\IST\ISCC.exe" 源码\installer\ScrcpyStudio.iss
 ; ============================================================================
 
-#define MyAppName        "Scrcpy Studio"
+#define MyAppName        "Scrcpy"
 #define MyAppVersion     "5.0.1"
 #define MyAppPublisher   "angusdevgo"
 #define MyAppURL         "https://github.com/angusdevgo/Scrcpy-Studio"
-#define MyAppExeName     "ScrcpyStudio.exe"
+#define MyAppExeName     "Scrcpy.exe"
 #define MyAppId          "{{B0D3F20A-0E7E-4232-8CFF-0DAEFE723116}"
 
 ; 成品目录（相对本 .iss 所在目录）
@@ -28,9 +28,9 @@ VersionInfoDescription={#MyAppName} 安装程序
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 
-; 默认安装到 当前用户\AppData\Local\Programs\Scrcpy Studio
-; 向导中可自由改到任意盘（如 D:\Scrcpy Studio）
-DefaultDirName={autopf}\Scrcpy Studio
+; 默认安装到 当前用户\AppData\Local\Programs\Scrcpy
+; 向导中可自由改到任意盘（如 D:\Scrcpy）
+DefaultDirName={autopf}\Scrcpy
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 DisableDirPage=no
@@ -57,7 +57,7 @@ SolidCompression=yes
 
 ; 输出
 OutputDir={#DistDir}
-OutputBaseFilename=ScrcpyStudio-Setup-{#MyAppVersion}
+OutputBaseFilename=Scrcpy-Setup-{#MyAppVersion}
 LicenseFile={#DistDir}\LICENSE.txt
 
 [Languages]

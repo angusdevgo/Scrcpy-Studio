@@ -1061,15 +1061,45 @@ namespace ScrcpyStudio
             private const string BundleId = "ScrcpyStudio.Core.v5.0.1.r2";
             private const string MarkerFile = ".bundle";
 
+            private static string _root;
+
+            /// <summary>
+            /// 引擎释放目录：
+            ///   1. 优先 &lt;exe 所在目录&gt;\core —— 安装到哪个盘就全在哪个盘，整个目录可整体拷走
+            ///   2. 该目录不可写（如 Program Files 无权限）时，退回 %LOCALAPPDATA%\ScrcpyStudio\core
+            /// </summary>
             public static string BundleRoot
             {
                 get
                 {
-                    string baseDir = Path.Combine(
+                    if (_root != null) return _root;
+
+                    string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string local = Path.Combine(exeDir, "core");
+                    if (CanWrite(exeDir))
+                    {
+                        _root = local;
+                        return _root;
+                    }
+
+                    _root = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "ScrcpyStudio");
-                    return Path.Combine(baseDir, "core");
+                        "ScrcpyStudio", "core");
+                    return _root;
                 }
+            }
+
+            private static bool CanWrite(string dir)
+            {
+                try
+                {
+                    if (!Directory.Exists(dir)) return false;
+                    string probe = Path.Combine(dir, ".write_probe");
+                    using (FileStream fs = new FileStream(probe, FileMode.Create, FileAccess.Write, FileShare.None)) { }
+                    File.Delete(probe);
+                    return true;
+                }
+                catch { return false; }
             }
 
             public static bool HasEmbeddedPayload()
@@ -1251,15 +1281,16 @@ namespace ScrcpyStudio
             {
                 string bundleRoot = CoreBundle.BundleRoot;
                 bool fromBundle = !string.IsNullOrEmpty(scrcpyExePath)
-                                  && scrcpyExePath.StartsWith(bundleRoot, StringComparison.OrdinalIgnoreCase);
+                                  && scrcpyExePath.StartsWith(bundleRoot, StringComparison.OrdinalIgnoreCase)
+                                  && File.Exists(Path.Combine(bundleRoot, ".bundle"));
                 if (fromBundle)
                 {
-                    lblEngineOrigin.Text = "● 内嵌引擎 · 已随 exe 打包，首次启动自动释放，无需任何外部文件";
+                    lblEngineOrigin.Text = "● 内嵌引擎 · 已随 exe 打包并释放到本目录 core 文件夹，无需任何外部文件";
                     lblEngineOrigin.ForeColor = UITheme.AccentGreen;
                 }
                 else if (!string.IsNullOrEmpty(scrcpyExePath))
                 {
-                    lblEngineOrigin.Text = "● 外置引擎 · 正在使用 core 目录中的自定义 scrcpy.exe";
+                    lblEngineOrigin.Text = "● 外置引擎 · 正在使用自定义 core\\scrcpy.exe";
                     lblEngineOrigin.ForeColor = Color.FromArgb(217, 119, 6);
                 }
                 else
@@ -2656,6 +2687,7 @@ namespace ScrcpyStudio
                         lblHeroState.ForeColor = UITheme.TextMuted;
                         ShowToast("投屏已结束", ToastKind.Info);
                         scrcpyProcess = null;
+                        RestoreMainWindow();
                     }));
                 };
 
@@ -2665,6 +2697,7 @@ namespace ScrcpyStudio
                 lblHeroState.ForeColor = UITheme.AccentGreen;
 
                 ShowToast("投屏已成功启动", ToastKind.Success);
+                ScheduleAutoHide();
             }
             catch (Exception ex)
             {
@@ -2684,6 +2717,48 @@ namespace ScrcpyStudio
                 catch { }
             }
         }
+
+        #region 投屏时自动隐藏主窗口 / 结束后自动弹回
+
+        private Timer autoHideTimer;
+
+        /// <summary>投屏启动后延迟隐藏主窗口，让投屏窗口拿到焦点</summary>
+        private void ScheduleAutoHide()
+        {
+            if (autoHideTimer == null)
+            {
+                autoHideTimer = new Timer();
+                autoHideTimer.Interval = 900;
+                autoHideTimer.Tick += (s, e) =>
+                {
+                    autoHideTimer.Stop();
+                    if (scrcpyProcess != null && !scrcpyProcess.HasExited)
+                    {
+                        this.WindowState = FormWindowState.Minimized;
+                    }
+                };
+            }
+            autoHideTimer.Stop();
+            autoHideTimer.Start();
+        }
+
+        /// <summary>投屏结束后把主窗口恢复并置于前台</summary>
+        private void RestoreMainWindow()
+        {
+            if (autoHideTimer != null) autoHideTimer.Stop();
+            try
+            {
+                if (!this.Visible) this.Show();
+                if (this.WindowState == FormWindowState.Minimized)
+                    this.WindowState = FormWindowState.Normal;
+                this.ShowInTaskbar = true;
+                this.Activate();
+                this.BringToFront();
+            }
+            catch { }
+        }
+
+        #endregion
 
         #endregion
 

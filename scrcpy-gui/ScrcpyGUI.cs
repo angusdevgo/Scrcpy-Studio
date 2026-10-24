@@ -8,6 +8,12 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyProduct("Scrcpy")]
+[assembly: System.Reflection.AssemblyTitle("Scrcpy")]
+[assembly: System.Reflection.AssemblyDescription("安卓投屏工具 · 内置引擎")]
+
 namespace ScrcpyStudio
 {
     #region Satelite 现代化薄荷玉石绿设计系统 (Satelite Mint & Porcelain Glass)
@@ -1058,7 +1064,7 @@ namespace ScrcpyStudio
         /// </summary>
         private static class CoreBundle
         {
-            private const string BundleId = "Scrcpy.Core.v5.0.1.r3";
+            private const string BundleId = "Scrcpy.Core.v1.0.r1";
             private const string MarkerFile = ".bundle";
 
             private static string _root;
@@ -1739,7 +1745,7 @@ namespace ScrcpyStudio
             // 中间状态信息
             lblHeroState = new Label
             {
-                Text = "● STANDBY · SCRCPY 5.0.1",
+                Text = "● STANDBY · SCRCPY 1.0",
                 Font = UITheme.FontSmall,
                 ForeColor = UITheme.TextSecondary,
                 BackColor = Color.Transparent,
